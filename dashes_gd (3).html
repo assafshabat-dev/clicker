@@ -1,0 +1,2651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>CLICKER</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#000;overflow:hidden;width:100vw;height:100vh;font-family:'Press Start 2P',monospace;
+  touch-action:none; -webkit-tap-highlight-color:transparent; user-select:none;}
+canvas{display:block;width:100%;height:100%;}
+
+/* כפתור נגיעה למובייל */
+#tapBtn{
+  display:none;
+  position:fixed;inset:0;z-index:4;
+  background:transparent;border:none;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+
+@media (max-width:768px), (pointer:coarse){
+  #tapBtn{ display:block; }
+}
+
+.screen{display:none;position:absolute;inset:0;z-index:5;flex-direction:column;align-items:center;justify-content:center;gap:22px;}
+.screen.on{display:flex;}
+#menuScreen{background:linear-gradient(180deg,#000820,#001a52);}
+#levelScreen{background:linear-gradient(180deg,#000820,#001a52);padding:30px;justify-content:flex-start;overflow-y:auto;}
+
+.title{font-size:clamp(32px,7vw,72px);color:#00cfff;text-shadow:0 0 20px #00cfff,4px 4px 0 #003399;letter-spacing:8px;animation:glow 2s infinite;}
+@keyframes glow{0%,100%{opacity:1;}50%{opacity:0.8;text-shadow:0 0 40px #00cfff,4px 4px 0 #003399;}}
+
+.cube-anim{width:54px;height:54px;background:#00e400;border:3px solid #fff;position:relative;animation:spin 1.5s linear infinite;}
+.cube-anim::after{content:'';position:absolute;inset:10px;background:#004400;border:2px solid #00e400;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.btn{font-family:'Press Start 2P',monospace;font-size:13px;padding:14px 32px;
+  background:#003399;color:#fff;border:3px solid #00cfff;cursor:pointer;
+  letter-spacing:2px;box-shadow:4px 4px 0 #001a5e;transition:all .1s;}
+.btn:hover{background:#00cfff;color:#000;transform:translate(-2px,-2px);box-shadow:6px 6px 0 #001a5e;}
+.btn:active{transform:translate(2px,2px);}
+.btn.sm{font-size:10px;padding:10px 18px;}
+
+.stitle{font-size:clamp(11px,2.5vw,20px);color:#00cfff;letter-spacing:4px;}
+
+.char-row{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;}
+.ccard{width:110px;background:#0d1433;border:3px solid #003399;padding:14px 8px;
+  display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:all .15s;}
+.ccard:hover,.ccard.sel{border-color:#00cfff;box-shadow:0 0 18px #00cfff;transform:translateY(-4px);}
+.ccard.sel::after{content:'✓';color:#00cfff;font-size:11px;}
+.cicon{width:54px;height:54px;}
+.cname{font-size:8px;color:#00cfff;letter-spacing:2px;}
+
+.lvl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));
+  gap:12px;width:100%;max-width:650px;margin-top:14px;}
+.lbtn{font-family:'Press Start 2P',monospace;font-size:9px;padding:14px 8px;
+  background:#0d1433;color:#fff;border:3px solid #003399;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:7px;transition:all .1s;}
+.lbtn:hover{border-color:#00cfff;box-shadow:0 0 14px #00cfff;transform:scale(1.05);}
+.lnum{font-size:22px;color:#00cfff;}
+.lstar{color:#ffd700;font-size:10px;}
+.ldiff{font-size:7px;color:#aaa;}
+.lbest{font-size:8px;color:#ffd700;margin-top:2px;}
+.row{display:flex;align-items:center;gap:14px;width:100%;max-width:650px;}
+.bbtn{font-family:'Press Start 2P',monospace;font-size:9px;padding:9px 12px;
+  background:transparent;color:#00cfff;border:2px solid #00cfff;cursor:pointer;}
+.bbtn:hover{background:#00cfff;color:#000;}
+
+/* HUD */
+#hud{position:absolute;inset:0;z-index:6;pointer-events:none;display:none;}
+.prog-wrap{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:55%;}
+.prog-bg{height:8px;background:rgba(255,255,255,.15);border-radius:4px;}
+.prog-fill{height:100%;background:#00cfff;border-radius:4px;width:0%;box-shadow:0 0 8px #00cfff;}
+.prog-pct{font-size:8px;color:rgba(255,255,255,.6);text-align:center;margin-top:3px;}
+.pause-btn{position:absolute;top:8px;right:12px;width:34px;height:34px;
+  background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.3);border-radius:50%;
+  cursor:pointer;pointer-events:all;display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:#fff;}
+.pause-btn:hover{background:rgba(255,255,255,.3);}
+
+/* Death / result */
+#resultScreen{background:rgba(0,0,0,.85);}
+.res-pct{font-size:clamp(50px,12vw,110px);color:#fff;font-family:'Press Start 2P',monospace;
+  text-shadow:0 0 30px #00cfff,0 0 60px #0066ff;animation:pop .4s cubic-bezier(.36,2,.6,1) both;}
+.res-lbl{font-size:clamp(9px,2vw,14px);color:rgba(255,255,255,.6);letter-spacing:4px;
+  margin-bottom:24px;font-family:'Press Start 2P',monospace;}
+.res-btns{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;
+  animation:slideup .5s .35s both ease-out;}
+@keyframes pop{0%{transform:scale(0);opacity:0;}100%{transform:scale(1);opacity:1;}}
+@keyframes slideup{0%{transform:translateY(30px);opacity:0;}100%{transform:translateY(0);opacity:1;}}
+
+/* Pause overlay */
+#pauseOverlay{display:none;position:absolute;inset:0;z-index:7;background:rgba(0,0,0,.8);
+  flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+#pauseOverlay.on{display:flex;}
+.pbox{background:#0d1433;border:3px solid #00cfff;padding:34px 44px;
+  display:flex;flex-direction:column;align-items:center;gap:16px;}
+.ptitle{font-size:clamp(14px,3vw,24px);color:#00cfff;}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<!-- כפתור נגיעה למובייל — שקוף מעל הכל -->
+<button id="tapBtn" ontouchstart="onTapStart(event)" ontouchend="onTapEnd(event)"></button>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="prog-wrap">
+    <div class="prog-bg"><div class="prog-fill" id="pf"></div></div>
+    <div class="prog-pct" id="pp">0%</div>
+  </div>
+  <div style="position:absolute;top:8px;left:12px;display:flex;gap:8px;align-items:center;">
+    <div id="shieldBtn" onclick="activateShield()" style="width:36px;height:36px;background:rgba(0,200,255,0.2);border:2px solid #00cfff;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;pointer-events:all;" title="מגן (לחץ לפעיל)">🛡</div>
+    <div id="shieldCount" style="font-size:8px;color:#00cfff;font-family:'Press Start 2P',monospace;"></div>
+    <div id="coinHUD" style="font-size:9px;color:#ffd700;font-family:'Press Start 2P',monospace;">★0</div>
+  </div>
+  <div class="pause-btn" onclick="togglePause()">⏸</div>
+</div>
+
+<!-- MENU -->
+<div class="screen on" id="menuScreen">
+  <div class="title">CLICKER</div>
+  <div class="cube-anim"></div>
+  <button class="btn" onclick="goChar()">▶ PLAY</button>
+  <div id="seasonPts" style="font-size:8px;color:#ffd700;font-family:'Press Start 2P',monospace;letter-spacing:2px;"></div>
+</div>
+
+<!-- SKIN SELECT -->
+<div class="screen" id="skinScreen">
+  <div class="stitle">SHOP</div>
+  <div id="shopCoins" style="font-size:14px;color:#ffd700;font-family:'Press Start 2P',monospace;margin-bottom:8px;text-shadow:0 0 10px #ffd700;">★ 0</div>
+
+  <!-- tab navigation -->
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;">
+    <button onclick="shopTab(-1)" style="font-family:'Press Start 2P',monospace;font-size:14px;background:transparent;border:none;color:#00cfff;cursor:pointer;padding:4px 10px;">◄</button>
+    <div id="shopTabLabel" style="font-size:9px;color:#fff;font-family:'Press Start 2P',monospace;letter-spacing:3px;min-width:80px;text-align:center;">SKINS</div>
+    <button onclick="shopTab(1)" style="font-family:'Press Start 2P',monospace;font-size:14px;background:transparent;border:none;color:#00cfff;cursor:pointer;padding:4px 10px;">►</button>
+  </div>
+
+  <div id="shopMsg" style="font-size:8px;color:#ff4444;font-family:'Press Start 2P',monospace;opacity:0;transition:opacity .3s;min-height:14px;"></div>
+  <div id="skinGrid" style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-height:52vh;overflow-y:auto;width:100%;max-width:650px;"></div>
+  <button class="btn sm" onclick="showScreen('charScreen')" style="margin-top:12px;">◄ BACK</button>
+</div>
+
+<!-- CHAR SELECT (embedded in menu flow) -->
+<div class="screen" id="charScreen">
+  <div class="stitle">SELECT CHARACTER</div>
+  <div class="char-row">
+    <div class="ccard sel" id="cc-cube" onclick="pickChar('cube',this)">
+      <div class="cicon"><svg viewBox="0 0 60 60"><rect x="2" y="2" width="56" height="56" fill="#00e400" stroke="#fff" stroke-width="3"/><rect x="14" y="14" width="32" height="32" fill="#004400" stroke="#00e400" stroke-width="2"/><rect x="22" y="22" width="16" height="16" fill="#00e400"/></svg></div>
+      <div class="cname">CUBE</div>
+    </div>
+    <div class="ccard" id="cc-ship" onclick="pickChar('ship',this)">
+      <div class="cicon"><svg viewBox="0 0 60 60"><polygon points="2,54 30,6 58,54" fill="#00cfff" stroke="#fff" stroke-width="3"/><polygon points="14,54 30,22 46,54" fill="#003399" stroke="#00cfff" stroke-width="2"/><circle cx="30" cy="48" r="7" fill="#ffd700" stroke="#fff" stroke-width="2"/></svg></div>
+      <div class="cname">SHIP</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;">
+    <button class="btn sm" onclick="showScreen('menuScreen')">◄ BACK</button>
+    <button class="btn sm" onclick="goSkins()">🎨 SKINS</button>
+    <button class="btn" onclick="goLevels()">LEVELS ▶</button>
+  </div>
+</div>
+
+<!-- LEVEL SELECT -->
+<div class="screen" id="levelScreen">
+  <div class="row">
+    <button class="bbtn" onclick="goChar()">◄ BACK</button>
+    <div class="stitle" id="lvlTitle">SELECT LEVEL</div>
+  </div>
+  <div class="lvl-grid" id="lvlGrid"></div>
+</div>
+
+<!-- CODE POPUP -->
+<div id="codePopup" style="display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.85);align-items:center;justify-content:center;">
+  <div style="background:#0d1433;border:3px solid #00cfff;padding:28px 32px;display:flex;flex-direction:column;align-items:center;gap:14px;">
+    <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:#00cfff;">🔒 שלב נעול</div>
+    <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#aaa;text-align:center;">עבור את השלב הקודם<br>או הכנס קוד סודי</div>
+    <input id="codeInput" type="password" placeholder="קוד..." maxlength="6"
+      style="font-family:'Press Start 2P',monospace;font-size:11px;padding:8px 12px;
+      background:#000d2e;color:#00cfff;border:2px solid #003399;width:130px;letter-spacing:4px;text-align:center;"
+      onkeydown="if(event.key==='Enter') checkCode()"/>
+    <span id="codeMsg" style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff4444;min-height:14px;"></span>
+    <div style="display:flex;gap:10px;">
+      <button class="btn sm" onclick="checkCode()">✓ אישור</button>
+      <button class="btn sm" onclick="closeCodePopup()">✕ ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT -->
+<div class="screen" id="resultScreen">
+  <div id="newBestBadge" style="display:none;font-size:clamp(10px,2vw,16px);color:#ffd700;letter-spacing:4px;animation:pop .4s cubic-bezier(.36,2,.6,1) both;text-shadow:0 0 20px #ffd700;">⭐ NEW BEST! ⭐</div>
+  <div class="res-pct" id="resPct">0%</div>
+  <div class="res-lbl" id="resLbl">YOU DIED</div>
+  <div class="res-btns">
+    <button class="btn" id="nextBtn" onclick="nextLevel()" style="display:none;background:#ffd700;color:#000;border-color:#ffd700;">▶ NEXT LEVEL</button>
+    <button class="btn" onclick="retry()">↺ RETRY</button>
+    <button class="btn" onclick="goLevels()">LEVELS</button>
+    <button class="btn" onclick="goChar()">MENU</button>
+  </div>
+</div>
+
+<!-- PAUSE -->
+<div id="pauseOverlay">
+  <div class="pbox">
+    <div class="ptitle">⏸ PAUSED</div>
+    <button class="btn" onclick="togglePause()">▶ RESUME</button>
+    <button class="btn" onclick="retry()">↺ RETRY</button>
+    <button class="btn" onclick="goLevels()">LEVELS</button>
+    <button class="btn" onclick="goChar()">MENU</button>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────
+// CANVAS
+// ─────────────────────────────────────────
+var cv  = document.getElementById('c');
+var ctx = cv.getContext('2d');
+var W=0, H=0;
+function resize(){ W=cv.width=cv.clientWidth; H=cv.height=cv.clientHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+// ─────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('on'); });
+  if(id){ var el=document.getElementById(id); if(el) el.classList.add('on'); }
+}
+function goChar()  {
+  stopGame();
+  var el = document.getElementById('seasonPts');
+
+  showScreen('charScreen');
+}
+function goSkins() { shopTabIdx=0; buildSkinGrid(); showScreen('skinScreen'); }
+function goLevels(){
+  stopGame();
+  buildLevelGrid();
+  document.getElementById('lvlTitle').textContent = selChar.toUpperCase()+' — SELECT LEVEL';
+  showScreen('levelScreen');
+}
+
+var DLABELS=['EASY','EASY','NORMAL','NORMAL','HARD','HARD','INSANE'];
+var DSTARS =['★','★★','★★★','★★★★','★★★★★','★★★★★★','★★★★★★★'];
+
+// ── שמירת תוצאות ──
+function getBest(lvl){
+  var k = 'best_'+selChar+'_lvl'+lvl;
+  return parseInt(localStorage.getItem(k)||'0');
+}
+function saveBest(lvl, pct){
+  var k = 'best_'+selChar+'_lvl'+lvl;
+  var cur = getBest(lvl);
+  if(pct > cur) localStorage.setItem(k, pct);
+}
+
+function isUnlocked(lvl){
+  if(lvl === 1) return true;
+  if(localStorage.getItem('allUnlocked') === '1') return true;
+  return getBest(lvl-1) === 100;
+}
+
+function checkCode(){
+  var code = document.getElementById('codeInput').value;
+  var msg  = document.getElementById('codeMsg');
+  if(code === '192013'){
+    localStorage.setItem('allUnlocked','1');
+    closeCodePopup();
+    buildLevelGrid();
+  } else {
+    msg.style.color = '#ff4444';
+    msg.textContent = 'קוד שגוי!';
+    document.getElementById('codeInput').value = '';
+    setTimeout(function(){ msg.textContent=''; }, 1500);
+  }
+}
+
+function openCodePopup(){
+  document.getElementById('codeInput').value = '';
+  document.getElementById('codeMsg').textContent = '';
+  document.getElementById('codePopup').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('codeInput').focus(); }, 50);
+}
+
+function closeCodePopup(){
+  document.getElementById('codePopup').style.display = 'none';
+}
+
+function buildLevelGrid(){
+  var g=document.getElementById('lvlGrid'); g.innerHTML='';
+  for(var i=1;i<=7;i++){
+    var b=document.createElement('button'); b.className='lbtn';
+    var best = getBest(i);
+    var unlocked = isUnlocked(i);
+    var bestHtml = best > 0
+      ? '<span class="lbest">'+(best===100?'✓ 100%':best+'%')+'</span>'
+      : '<span class="lbest" style="opacity:0.3">—</span>';
+    if(!unlocked){
+      b.innerHTML='<span class="lnum" style="color:#555">'+i+'</span>'
+                 +'<span class="lstar" style="color:#333">'+DSTARS[i-1]+'</span>'
+                 +'<span class="ldiff">'+DLABELS[i-1]+'</span>'
+                 +'<span class="lbest" style="color:#555">🔒</span>';
+      b.style.opacity='0.45';
+      b.style.cursor='not-allowed';
+      b.addEventListener('click', function(){
+        openCodePopup();
+      });
+    } else {
+      b.innerHTML='<span class="lnum">'+i+'</span>'
+                 +'<span class="lstar">'+DSTARS[i-1]+'</span>'
+                 +'<span class="ldiff">'+DLABELS[i-1]+'</span>'
+                 +bestHtml;
+      (function(lv){ b.addEventListener('click', function(){ startLevel(lv); }); })(i);
+    }
+    g.appendChild(b);
+  }
+}
+
+var selChar = 'cube';
+var selSkin = 'classic';
+var selColor = 'green';
+var selPattern = 'solid';
+var shieldCount = 0;
+
+// ── מערכת מטבעות ──
+function getTotalCoins(){ return parseInt(localStorage.getItem('total_coins')||'0'); }
+function spendCoins(n){
+  var c = getTotalCoins();
+  if(c < n) return false;
+  localStorage.setItem('total_coins', c - n);
+  return true;
+}
+function earnCoins(n){
+  localStorage.setItem('total_coins', getTotalCoins() + n);
+  updateCoinDisplay();
+}
+function updateCoinDisplay(){
+  var el = document.getElementById('shopCoins');
+  if(el) el.textContent = '★ ' + getTotalCoins();
+}
+
+// ── צבעים ──
+var COLORS = [
+  { id:'green',  name:'GREEN',  color:'#00e400', inner:'#004400', stroke:'#00e400', cost:0,  free:true },
+  { id:'blue',   name:'BLUE',   color:'#00cfff', inner:'#003344', stroke:'#00cfff', cost:5  },
+  { id:'red',    name:'RED',    color:'#ff3333', inner:'#330000', stroke:'#ff3333', cost:5  },
+  { id:'purple', name:'PURPLE', color:'#cc44ff', inner:'#220033', stroke:'#cc44ff', cost:5  },
+  { id:'orange', name:'ORANGE', color:'#ff8800', inner:'#331500', stroke:'#ff8800', cost:5  },
+  { id:'silver', name:'SILVER', color:'#c0c0c0', inner:'#404040', stroke:'#ffffff', cost:10 },
+  { id:'gold',   name:'GOLD',   color:'#ffd700', inner:'#664400', stroke:'#ffd700', cost:10 },
+];
+
+// ── פטרנים (מוצגים תמיד בירוק) ──
+var PATTERNS = [
+  { id:'solid',   name:'SOLID',   cost:0,  free:true },
+  { id:'stripes', name:'STRIPES', cost:5  },
+  { id:'squares', name:'SQUARES', cost:10 },
+  { id:'dots',    name:'DOTS',    cost:15 },
+  { id:'diamond', name:'DIAMOND', cost:20 },
+];
+
+function isColorOwned(c){ return c.free || localStorage.getItem('color_owned_'+c.id)==='1'; }
+function isPatternOwned(p){ return p.free || localStorage.getItem('pattern_owned_'+p.id)==='1'; }
+
+function buyColor(id){
+  var c = COLORS.find(function(x){ return x.id===id; });
+  if(!c||isColorOwned(c)) return;
+  if(!spendCoins(c.cost)){ showShopMsg('אין מספיק ★!'); return; }
+  localStorage.setItem('color_owned_'+id,'1');
+  buildSkinGrid(); updateCoinDisplay();
+}
+function buyPattern(id){
+  var p = PATTERNS.find(function(x){ return x.id===id; });
+  if(!p||isPatternOwned(p)) return;
+  if(!spendCoins(p.cost)){ showShopMsg('אין מספיק ★!'); return; }
+  localStorage.setItem('pattern_owned_'+id,'1');
+  buildSkinGrid(); updateCoinDisplay();
+}
+function showShopMsg(msg){
+  var el = document.getElementById('shopMsg');
+  if(!el) return;
+  el.textContent=msg; el.style.opacity='1';
+  setTimeout(function(){ el.style.opacity='0'; },1500);
+}
+
+function drawPatternSVG(patId){
+  var c='#00e400', i='#004400', s='#00e400', pat='';
+  if(patId==='solid'){
+    pat='<rect x="14" y="14" width="32" height="32" fill="'+i+'"/><rect x="22" y="22" width="16" height="16" fill="'+c+'"/>';
+  } else if(patId==='stripes'){
+    pat='<rect x="2" y="16" width="56" height="9" fill="'+i+'"/><rect x="2" y="35" width="56" height="9" fill="'+i+'"/>';
+  } else if(patId==='squares'){
+    pat='<rect x="6" y="6" width="20" height="20" fill="'+i+'"/><rect x="34" y="6" width="20" height="20" fill="'+i+'"/>'
+       +'<rect x="6" y="34" width="20" height="20" fill="'+i+'"/><rect x="34" y="34" width="20" height="20" fill="'+i+'"/>';
+  } else if(patId==='dots'){
+    pat='<circle cx="16" cy="16" r="7" fill="'+i+'"/><circle cx="44" cy="16" r="7" fill="'+i+'"/>'
+       +'<circle cx="16" cy="44" r="7" fill="'+i+'"/><circle cx="44" cy="44" r="7" fill="'+i+'"/>'
+       +'<circle cx="30" cy="30" r="7" fill="'+i+'"/>';
+  } else if(patId==='diamond'){
+    pat='<polygon points="30,6 54,30 30,54 6,30" fill="'+i+'" stroke="'+s+'" stroke-width="2"/>';
+  }
+  return '<svg viewBox="0 0 60 60"><rect x="2" y="2" width="56" height="56" fill="'+c+'" stroke="'+s+'" stroke-width="3"/>'+pat+'</svg>';
+}
+
+function drawColorSVG(col){
+  return '<svg viewBox="0 0 60 60"><rect x="2" y="2" width="56" height="56" fill="'+col.color+'" stroke="'+col.stroke+'" stroke-width="3"/>'
+    +'<rect x="14" y="14" width="32" height="32" fill="'+col.inner+'"/>'
+    +'<rect x="22" y="22" width="16" height="16" fill="'+col.color+'"/></svg>';
+}
+
+var shopTabIdx = 0; // 0=skins, 1=colors
+var SHOP_TABS = ['SKINS','COLORS'];
+
+function shopTab(dir){
+  shopTabIdx = (shopTabIdx + dir + SHOP_TABS.length) % SHOP_TABS.length;
+  buildSkinGrid();
+}
+
+function buildSkinGrid(){
+  var g = document.getElementById('skinGrid'); if(!g) return;
+  var lbl = document.getElementById('shopTabLabel');
+  if(lbl) lbl.textContent = SHOP_TABS[shopTabIdx];
+  g.innerHTML='';
+
+  if(shopTabIdx === 0){
+    // ── פטרנים (ללא שם) ──
+    PATTERNS.forEach(function(pat){
+      var owned=isPatternOwned(pat), sel=selPattern===pat.id;
+      var card=document.createElement('div');
+      card.className='ccard'+(sel?' sel':'');
+      if(!owned) card.style.opacity='0.55';
+      card.innerHTML='<div class="cicon">'+drawPatternSVG(pat.id)+'</div>'
+        +(owned?'':'<div style="font-size:11px;color:#ffd700;margin-top:4px;font-family:\'Press Start 2P\',monospace;">★'+pat.cost+'</div>');
+      card.addEventListener('click', function(){
+        if(!owned){ buyPattern(pat.id); return; }
+        selPattern=pat.id; localStorage.setItem('selPattern',pat.id); buildSkinGrid();
+      });
+      g.appendChild(card);
+    });
+  } else {
+    // ── צבעים ──
+    COLORS.forEach(function(col){
+      var owned=isColorOwned(col), sel=selColor===col.id;
+      var card=document.createElement('div');
+      card.className='ccard'+(sel?' sel':'');
+      if(!owned) card.style.opacity='0.55';
+      card.innerHTML='<div class="cicon">'+drawColorSVG(col)+'</div>'
+        +'<div class="cname">'+col.name+'</div>'
+        +(owned?'':'<div style="font-size:11px;color:#ffd700;margin-top:4px;font-family:\'Press Start 2P\',monospace;">★'+col.cost+'</div>');
+      card.addEventListener('click', function(){
+        if(!owned){ buyColor(col.id); return; }
+        selColor=col.id; localStorage.setItem('selColor',col.id); buildSkinGrid();
+      });
+      g.appendChild(card);
+    });
+  }
+  updateCoinDisplay();
+}
+
+function getCurColor(){
+  return COLORS.find(function(c){ return c.id===selColor; }) || COLORS[0];
+}
+
+function activateShield(){
+  if(shieldCount > 0 && active && !shield){
+    shield = true; shieldCount--;
+    updateShieldHUD();
+  }
+}
+function updateShieldHUD(){
+  var el = document.getElementById('shieldCount');
+  if(el) el.textContent = shieldCount > 0 ? '×'+shieldCount : '';
+  var btn = document.getElementById('shieldBtn');
+  if(btn) btn.style.background = shield ? 'rgba(0,255,255,0.4)' : 'rgba(0,200,255,0.2)';
+}
+
+(function(){
+  var sc=localStorage.getItem('selColor');   if(sc) selColor=sc;
+  var sp=localStorage.getItem('selPattern'); if(sp) selPattern=sp;
+  shieldCount=parseInt(localStorage.getItem('shields')||'0');
+})();
+
+// ── מערכת מטבעות ──
+function getTotalCoins(){ return parseInt(localStorage.getItem('total_coins')||'0'); }
+function spendCoins(n){
+  var c = getTotalCoins();
+  if(c < n) return false;
+  localStorage.setItem('total_coins', c - n);
+  return true;
+}
+function earnCoins(n){
+  localStorage.setItem('total_coins', getTotalCoins() + n);
+  updateCoinDisplay();
+}
+function updateCoinDisplay(){
+  var el = document.getElementById('shopCoins');
+  if(el) el.textContent = '★ ' + getTotalCoins();
+}
+
+function pickChar(name, el){
+  selChar = name;
+  document.querySelectorAll('.ccard').forEach(function(c){ c.classList.remove('sel'); });
+  el.classList.add('sel');
+}
+
+// ─────────────────────────────────────────
+// INPUT
+// ─────────────────────────────────────────
+var held  = false; // jump/thrust held
+var edge  = false; // jump edge (fresh press)
+
+window.addEventListener('keydown', function(e){
+  if(e.code==='Space'||e.code==='ArrowUp'){
+    e.preventDefault();
+    var rs = document.getElementById('resultScreen');
+    if(rs && rs.classList.contains('on')){ retry(); return; }
+    if(!held) edge=true;
+    held=true;
+  }
+  if(e.code==='Escape') togglePause();
+});
+window.addEventListener('keyup', function(e){
+  if(e.code==='Space'||e.code==='ArrowUp') held=false;
+});
+cv.addEventListener('pointerdown', function(){
+  var rs = document.getElementById('resultScreen');
+  if(rs && rs.classList.contains('on')){ retry(); return; }
+  if(!held) edge=true; held=true;
+});
+cv.addEventListener('pointerup', function(){ held=false; });
+
+// מגע למובייל
+function onTapStart(e){
+  e.preventDefault();
+  var rs = document.getElementById('resultScreen');
+  if(rs && rs.classList.contains('on')){ retry(); return; }
+  if(!active){
+    // אם בהפסקה
+    var po = document.getElementById('pauseOverlay');
+    if(po && po.classList.contains('on')) return;
+  }
+  if(!held) edge=true;
+  held=true;
+}
+function onTapEnd(e){
+  e.preventDefault();
+  held=false;
+}
+
+// מנע גלילה בטלפון
+document.addEventListener('touchmove', function(e){ e.preventDefault(); }, {passive:false});
+
+// ─────────────────────────────────────────
+// GAME WORLD CONSTANTS
+// ─────────────────────────────────────────
+var T = 40; // tile size in pixels
+
+// PHYSICS — identical on all levels. Only SPEED changes.
+// Gravity and jump tuned so the cube jumps exactly ~60px high
+// (enough to clear one T=40 spike with 20px margin)
+var GRAV      = 1.8;
+var JUMP_VY   = -18.0;
+
+var SPEEDS = [6, 7, 8, 9, 10, 12, 14];
+
+function getTargetSpeed(){
+  var base = SPEEDS[curLvl-1];
+  if(curLvl === 3){
+    return prog >= 0.55 ? 8 : 7;
+  }
+  return base;
+}
+
+// Screen layout
+var FLOOR_FRAC = 0.75;  // floor as fraction of screen height
+function FLOOR(){ return Math.round(H * FLOOR_FRAC); }
+function CEIL() { return 44; } // ceiling y for ship mode
+
+// ─────────────────────────────────────────
+// LEVEL GENERATION
+// ─────────────────────────────────────────
+// Spike world-x positions only — nothing else.
+// For ship: also ceiling spikes and hanging walls.
+// Gap between obstacles always guarantees a clear jump path.
+// Level color themes — each level has its own GD-style palette
+var LEVEL_THEMES = [
+  { sky1:'#000510', sky2:'#000d1a', block:'#001830', blockStroke:'#00ffff', blockInner:'#000d20', ground:'#000208', groundTile:'#001020', glow:'#00ffff', spikeFill:'#00ffff', bgGrid:'rgba(0,255,255,0.08)' },
+  { sky1:'#0a0018', sky2:'#12002a', block:'#1a0035', blockStroke:'#ff00ff', blockInner:'#0d0020', ground:'#050008', groundTile:'#100018', glow:'#ff00ff', spikeFill:'#ff44ff', bgGrid:'rgba(255,0,255,0.08)' },
+  { sky1:'#000f08', sky2:'#001a10', block:'#002215', blockStroke:'#00ff88', blockInner:'#001008', ground:'#000502', groundTile:'#001008', glow:'#00ff88', spikeFill:'#00ffaa', bgGrid:'rgba(0,255,136,0.08)' },
+  { sky1:'#100300', sky2:'#1a0500', block:'#2a0800', blockStroke:'#ff4400', blockInner:'#150400', ground:'#050100', groundTile:'#100300', glow:'#ff4400', spikeFill:'#ff8844', bgGrid:'rgba(255,68,0,0.08)' },
+  { sky1:'#000810', sky2:'#001020', block:'#001828', blockStroke:'#0088ff', blockInner:'#000d18', ground:'#000408', groundTile:'#000d18', glow:'#0088ff', spikeFill:'#44aaff', bgGrid:'rgba(0,136,255,0.08)' },
+  { sky1:'#080010', sky2:'#100020', block:'#180030', blockStroke:'#ff0088', blockInner:'#0c0018', ground:'#030005', groundTile:'#080010', glow:'#ff0088', spikeFill:'#ff44aa', bgGrid:'rgba(255,0,136,0.08)' },
+  { sky1:'#0a0800', sky2:'#150f00', block:'#201500', blockStroke:'#ffcc00', blockInner:'#100a00', ground:'#040300', groundTile:'#0a0800', glow:'#ffcc00', spikeFill:'#ffdd44', bgGrid:'rgba(255,204,0,0.08)' },
+];
+
+function getTheme(){ return LEVEL_THEMES[Math.min(curLvl-1, LEVEL_THEMES.length-1)]; }
+
+// ── Helper: build platform from floor up ──
+// p(wx, heightTiles, widthTiles) — wall rooted on floor
+function mkWall(wx, h, w){ 
+  var fy = FLOOR();
+  return { wx:wx, wy: fy - h*T, tiles:w, h:h };
+}
+// s(wx) — spike at wx
+function mkSpike(wx){ return wx; }
+
+// ── Fixed handcrafted level layouts ──
+// Each entry: { spikes:[], platforms:[] }
+// All x values are world-x pixels. T=40.
+var LEVEL_MAPS = [
+  // 1 — עוצב ידנית על ידי השחקן
+  function(mkWall,mkP){ var S=[], P=[], CS=[], PL=[], SS=[], PT=[], IS=[];
+    P.push({wx:1320, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:1360, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:1400, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:1440, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:1480, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:1520, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:1560, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:1600, wy:null, tiles:6, h:1, tspikes:[]});
+    P.push({wx:1680, wy:null, tiles:7, h:2, tspikes:[]});
+    P.push({wx:2040, wy:null, tiles:5, h:1, tspikes:[]});
+    P.push({wx:2240, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:2320, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:2400, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:2440, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:2480, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:2520, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:2560, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:2600, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:2640, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:2680, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:2720, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:2760, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:2800, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:2840, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:2880, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:2920, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:2960, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:3000, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:3040, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:3080, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:3120, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:3160, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:3200, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3240, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3280, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3320, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3360, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3400, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3440, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3480, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:3520, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:3560, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3600, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3640, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3680, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:4080, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4120, wy:null, tiles:3, h:1, tspikes:[]});
+    P.push({wx:4160, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4200, wy:null, tiles:4, h:2, tspikes:[]});
+    P.push({wx:4240, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:4260, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:4280, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:4320, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:4360, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:4400, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:4440, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:4480, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:4480, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4520, wy:null, tiles:1, h:1, tspikes:[]});
+    SS.push(360); SS.push(760); SS.push(1280); SS.push(1960); SS.push(2000); SS.push(2280); SS.push(3920);
+    PL.push(mkP(2360, 1));
+    PL.push(mkP(3720, 1));
+    return {len:5000, spikes:S, cspikes:CS, walls:[], platforms:P, pillars:PL, smallspikes:SS, portals:PT, invspikes:IS};
+  },
+  // 2 — עוצב ידנית על ידי השחקן
+  function(mkWall,mkP){ var S=[], P=[], CS=[], PL=[], SS=[], PT=[], IS=[];
+    P.push({wx:1400, wy:null, tiles:7, h:1, tspikes:[]});
+    P.push({wx:1720, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:1800, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:1880, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:1960, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2480, wy:120, tiles:9, h:1, tspikes:[]});
+    P.push({wx:2480, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2480, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2840, wy:120, tiles:7, h:1, tspikes:[]});
+    P.push({wx:2920, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2920, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3000, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3040, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3080, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3120, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3120, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3120, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3160, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3160, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3160, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3600, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3640, wy:null, tiles:3, h:1, tspikes:[]});
+    P.push({wx:3720, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:3760, wy:null, tiles:4, h:2, tspikes:[]});
+    P.push({wx:4000, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4120, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4240, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4280, wy:160, tiles:1, h:1, tspikes:[0]});
+    P.push({wx:4320, wy:160, tiles:3, h:1, tspikes:[]});
+    P.push({wx:4440, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:4480, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:4520, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:4560, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4560, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:4600, wy:null, tiles:1, h:2, tspikes:[0]});
+    P.push({wx:4640, wy:null, tiles:2, h:1, tspikes:[]});
+    P.push({wx:4720, wy:null, tiles:2, h:1, tspikes:[]});
+    S.push(1040); S.push(1760); S.push(1840); S.push(2120); S.push(3360); S.push(3920); S.push(3960); S.push(4000); S.push(4040); S.push(4080); S.push(4120); S.push(4160); S.push(4200); S.push(4240); S.push(4280); S.push(4320); S.push(4360); S.push(4400);
+    SS.push(800); SS.push(1680); SS.push(1920); SS.push(2320); SS.push(3560);
+    PT.push({wx:2480});
+    PT.push({wx:3160});
+    IS.push({wx:2680, wy:160});
+    IS.push({wx:2880, wy:160});
+    IS.push({wx:2960, wy:160});
+    return {len:5600, spikes:S, cspikes:CS, walls:[], platforms:P, pillars:PL, smallspikes:SS, portals:PT, invspikes:IS};
+  },
+  // 3 — עוצב ידנית על ידי השחקן
+  function(mkWall,mkP){ var S=[], P=[], CS=[], PL=[], SS=[], PT=[], IS=[];
+    P.push({wx:880, wy:null, tiles:5, h:1, tspikes:[]});
+    P.push({wx:1040, wy:null, tiles:8, h:2, tspikes:[]});
+    P.push({wx:1360, wy:null, tiles:6, h:3, tspikes:[]});
+    P.push({wx:1600, wy:null, tiles:5, h:2, tspikes:[]});
+    P.push({wx:1800, wy:null, tiles:8, h:1, tspikes:[]});
+    P.push({wx:2200, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2320, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2440, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2560, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2600, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2640, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2680, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2720, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2760, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2800, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2840, wy:120, tiles:2, h:1, tspikes:[]});
+    P.push({wx:2920, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:2960, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3000, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:3040, wy:null, tiles:6, h:1, tspikes:[]});
+    P.push({wx:3280, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3320, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:3440, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3560, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3600, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:3600, wy:null, tiles:4, h:3, tspikes:[]});
+    P.push({wx:3640, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3640, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:3680, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3680, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:3720, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3720, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:3760, wy:null, tiles:4, h:2, tspikes:[]});
+    P.push({wx:3920, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3960, wy:null, tiles:3, h:1, tspikes:[]});
+    P.push({wx:4320, wy:160, tiles:5, h:1, tspikes:[]});
+    P.push({wx:4520, wy:160, tiles:4, h:1, tspikes:[]});
+    P.push({wx:4520, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4560, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4600, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4640, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4680, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4680, wy:160, tiles:1, h:1, tspikes:[]});
+    S.push(520); S.push(2120); S.push(2160); S.push(2200); S.push(2240); S.push(2280); S.push(2320); S.push(2360); S.push(2400); S.push(2440); S.push(2480); S.push(2520); S.push(2560); S.push(2600); S.push(2640); S.push(2680); S.push(2720); S.push(2760); S.push(2800); S.push(2840); S.push(2880); S.push(3360); S.push(3400); S.push(3480); S.push(3520); S.push(4080);
+    SS.push(760);
+    PT.push({wx:4280});
+    PT.push({wx:4680});
+    var GS=[];
+    GS.push({wx:2600}); GS.push({wx:3200}); GS.push({wx:3800}); GS.push({wx:4400});
+    return {len:5520, spikes:S, cspikes:CS, walls:[], platforms:P, pillars:PL, smallspikes:SS, portals:PT, invspikes:IS, ghostspikes:GS};
+  },
+  // 4 — עוצב ידנית על ידי השחקן
+  function(mkWall,mkP){ var S=[], P=[], CS=[], PL=[], SS=[], PT=[], IS=[], GS=[], CN=[];
+    P.push({wx:1280, wy:null, tiles:8, h:1, tspikes:[]});
+    P.push({wx:1600, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:1640, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:1760, wy:null, tiles:10, h:1, tspikes:[]});
+    P.push({wx:2200, wy:240, tiles:3, h:1, tspikes:[]});
+    P.push({wx:2320, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2480, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2520, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2760, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2880, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:2920, wy:280, tiles:3, h:1, tspikes:[]});
+    P.push({wx:3040, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3160, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:3280, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3720, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3720, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3720, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3720, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3760, wy:80, tiles:7, h:1, tspikes:[]});
+    P.push({wx:4000, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4040, wy:80, tiles:11, h:1, tspikes:[]});
+    P.push({wx:4120, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4120, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4200, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4480, wy:80, tiles:12, h:1, tspikes:[]});
+    P.push({wx:4600, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4720, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4720, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4800, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4840, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4920, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4920, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4960, wy:80, tiles:8, h:1, tspikes:[]});
+    P.push({wx:4960, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5000, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5000, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5040, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5080, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5080, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5080, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5120, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5160, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5200, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5280, wy:80, tiles:5, h:1, tspikes:[]});
+    P.push({wx:5280, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5320, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5360, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5360, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5400, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5400, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5440, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5440, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5440, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5480, wy:80, tiles:4, h:1, tspikes:[]});
+    P.push({wx:5480, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5480, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5480, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5520, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5520, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5520, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5560, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5560, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5600, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5600, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6040, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6160, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6280, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6400, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6520, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6640, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6840, wy:280, tiles:3, h:1, tspikes:[]});
+    P.push({wx:7040, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7160, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7280, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7320, wy:null, tiles:5, h:3, tspikes:[]});
+    P.push({wx:7320, wy:160, tiles:5, h:1, tspikes:[]});
+    P.push({wx:7520, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7680, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7840, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7960, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8080, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8120, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8160, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8200, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8280, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8320, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8400, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8400, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8400, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8400, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8440, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8440, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8480, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8480, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8760, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8800, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8840, wy:280, tiles:2, h:1, tspikes:[]});
+    P.push({wx:8920, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8960, wy:280, tiles:2, h:1, tspikes:[]});
+    P.push({wx:9040, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9080, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9360, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9480, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:9560, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9680, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:9800, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:9880, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:10000, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:10120, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:10200, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:10240, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:10360, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:10480, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:10560, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:10600, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11000, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11240, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11440, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11560, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11560, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11640, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11760, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11760, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11800, wy:280, tiles:2, h:1, tspikes:[0,1]});
+    P.push({wx:11880, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11880, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11960, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:11960, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:12000, wy:280, tiles:2, h:1, tspikes:[0,1]});
+    P.push({wx:12080, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:12080, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:12120, wy:240, tiles:2, h:1, tspikes:[0,1]});
+    P.push({wx:12120, wy:280, tiles:2, h:1, tspikes:[]});
+    P.push({wx:12200, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:12200, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:12280, wy:280, tiles:2, h:1, tspikes:[]});
+    P.push({wx:12440, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:12440, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:12520, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:12560, wy:280, tiles:2, h:1, tspikes:[]});
+    P.push({wx:12720, wy:280, tiles:2, h:1, tspikes:[]});
+    P.push({wx:12800, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:12920, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:13160, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:13280, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:13280, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:13600, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:13720, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:13840, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:13960, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:14080, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:14200, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:14640, wy:null, tiles:6, h:1, tspikes:[]});
+    P.push({wx:14880, wy:null, tiles:8, h:1, tspikes:[]});
+    P.push({wx:15200, wy:null, tiles:8, h:1, tspikes:[6,7]});
+    P.push({wx:15400, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:15520, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:15520, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:15560, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:15560, wy:240, tiles:2, h:1, tspikes:[0,1]});
+    P.push({wx:15600, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:15640, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:15640, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:15680, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:15680, wy:240, tiles:1, h:1, tspikes:[0]});
+    P.push({wx:15720, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:15760, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:15760, wy:240, tiles:2, h:1, tspikes:[0,1]});
+    P.push({wx:15800, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:15840, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:15880, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:15880, wy:240, tiles:1, h:1, tspikes:[0]});
+    P.push({wx:15920, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:15960, wy:null, tiles:1, h:1, tspikes:[0]});
+    P.push({wx:16000, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:16040, wy:null, tiles:1, h:1, tspikes:[0]});
+    P.push({wx:16080, wy:null, tiles:1, h:1, tspikes:[0]});
+    P.push({wx:16120, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:16160, wy:null, tiles:3, h:1, tspikes:[]});
+    P.push({wx:16160, wy:240, tiles:2, h:1, tspikes:[0,1]});
+    P.push({wx:16240, wy:null, tiles:1, h:4, tspikes:[]});
+    P.push({wx:16320, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:16360, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:16480, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:16600, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:16640, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:16680, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:16840, wy:120, tiles:6, h:1, tspikes:[]});
+    P.push({wx:17080, wy:120, tiles:3, h:1, tspikes:[]});
+    P.push({wx:17200, wy:120, tiles:5, h:1, tspikes:[]});
+    P.push({wx:17200, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:17320, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:17360, wy:200, tiles:2, h:1, tspikes:[]});
+    P.push({wx:17400, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:18080, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:18120, wy:null, tiles:8, h:1, tspikes:[]});
+    P.push({wx:18440, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:18480, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:18600, wy:null, tiles:7, h:1, tspikes:[]});
+    P.push({wx:18960, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:19080, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:19200, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:19720, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:19840, wy:280, tiles:1, h:1, tspikes:[]});
+    S.push(640); S.push(960); S.push(1680); S.push(1720); S.push(2160); S.push(2200); S.push(2240); S.push(2280); S.push(2320); S.push(2360); S.push(2800); S.push(2840); S.push(3080); S.push(3120); S.push(3200); S.push(3240); S.push(6080); S.push(6120); S.push(6960); S.push(7000); S.push(7040); S.push(7080); S.push(7120); S.push(7160); S.push(7200); S.push(7240); S.push(7280); S.push(7520); S.push(7560); S.push(7600); S.push(7640); S.push(7680); S.push(7720); S.push(7760); S.push(7800); S.push(7840); S.push(7880); S.push(7920); S.push(7960); S.push(8000); S.push(8040); S.push(8080); S.push(8120); S.push(8160); S.push(8200); S.push(8200); S.push(8240); S.push(8280); S.push(8320); S.push(8360); S.push(9400); S.push(9440); S.push(9520); S.push(9600); S.push(9640); S.push(9720); S.push(9760); S.push(9840); S.push(9920); S.push(9960); S.push(10040); S.push(10080); S.push(10160); S.push(10280); S.push(10320); S.push(10520); S.push(10960); S.push(11160); S.push(11200); S.push(12640); S.push(12680); S.push(12840); S.push(12880); S.push(13080); S.push(13120); S.push(13640); S.push(13680); S.push(13720); S.push(13760); S.push(13800); S.push(13840); S.push(13880); S.push(13920); S.push(13960); S.push(14000); S.push(14040); S.push(14080); S.push(14120); S.push(14160); S.push(14200); S.push(14400); S.push(16280); S.push(16400); S.push(16440); S.push(16520); S.push(16560); S.push(16720); S.push(16760); S.push(17720); S.push(18520); S.push(18560); S.push(18880); S.push(18920); S.push(18960); S.push(19000); S.push(19040); S.push(19080); S.push(19120); S.push(19160); S.push(19200); S.push(19760); S.push(19800);
+    SS.push(11480); SS.push(11520); SS.push(11600); SS.push(11680); SS.push(11720); SS.push(11920); SS.push(12240); SS.push(12360); SS.push(12400); SS.push(12480);
+    CS.push(8200);
+    PT.push({wx:3680}); PT.push({wx:5600}); PT.push({wx:16800}); PT.push({wx:17400});
+    IS.push({wx:4040, wy:120}); IS.push({wx:4080, wy:120}); IS.push({wx:4160, wy:120}); IS.push({wx:4240, wy:120}); IS.push({wx:4640, wy:120}); IS.push({wx:4680, wy:120}); IS.push({wx:4760, wy:120}); IS.push({wx:4880, wy:120}); IS.push({wx:5040, wy:160}); IS.push({wx:17160, wy:160}); IS.push({wx:17240, wy:160}); IS.push({wx:17280, wy:160}); IS.push({wx:17320, wy:160}); IS.push({wx:17360, wy:160});
+    var DZ=[];
+    DZ.push({wx:5320}); DZ.push({wx:5440}); DZ.push({wx:6040});
+    var GS=[];
+    GS.push(8720); GS.push(9120); GS.push(10920); GS.push(18040); GS.push(19400); GS.push(19680); GS.push(19880);
+    var CN=[];
+    CN.push({wx:4800, wy:200}); CN.push({wx:6640, wy:80}); CN.push({wx:19720, wy:240});
+    return {len:20680, spikes:S, cspikes:CS, walls:[], platforms:P, pillars:PL, smallspikes:SS, portals:PT, invspikes:IS, darkzones:DZ, ghostspikes:GS, coins:CN};
+  },
+  // 5 — עוצב ידנית
+  function(mkWall,mkP){ var S=[], P=[], CS=[], PL=[], SS=[], PT=[], IS=[], GS=[], CN=[], BP=[];
+    P.push({wx:1480, wy:null, tiles:13, h:1, tspikes:[]});
+    P.push({wx:2240, wy:null, tiles:6, h:1, tspikes:[]});
+    P.push({wx:2480, wy:null, tiles:4, h:1, tspikes:[]});
+    P.push({wx:2520, wy:null, tiles:6, h:2, tspikes:[]});
+    P.push({wx:2760, wy:null, tiles:4, h:2, tspikes:[]});
+    P.push({wx:2920, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:2960, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3000, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3040, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3080, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3120, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3160, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3200, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3240, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3280, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3320, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:3360, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3360, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3360, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3400, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3400, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3400, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3440, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3440, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3440, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3440, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3480, wy:240, tiles:4, h:1, tspikes:[]});
+    P.push({wx:3480, wy:280, tiles:4, h:1, tspikes:[]});
+    P.push({wx:3480, wy:200, tiles:5, h:1, tspikes:[]});
+    P.push({wx:3480, wy:160, tiles:7, h:1, tspikes:[]});
+    P.push({wx:3640, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3640, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3680, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3680, wy:280, tiles:2, h:1, tspikes:[]});
+    P.push({wx:3680, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3720, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3720, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3760, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3760, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3760, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3800, wy:240, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3800, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3840, wy:280, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3880, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3920, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:3960, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4000, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4040, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4080, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4120, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4160, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4200, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4240, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4280, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4320, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4360, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4400, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4440, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4600, wy:null, tiles:6, h:3, tspikes:[]});
+    P.push({wx:4840, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:4840, wy:null, tiles:1, h:3, tspikes:[]});
+    P.push({wx:4880, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4880, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:4920, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4920, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:4960, wy:null, tiles:1, h:1, tspikes:[]});
+    P.push({wx:4960, wy:null, tiles:1, h:2, tspikes:[]});
+    P.push({wx:5080, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5080, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5080, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5080, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5080, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5080, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5120, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5160, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5200, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5240, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5280, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5320, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5360, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5400, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5440, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5440, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5480, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5480, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5520, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5520, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5560, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5560, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5600, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5600, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5640, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5640, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5680, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5680, wy:40, tiles:2, h:1, tspikes:[]});
+    P.push({wx:5720, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5760, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5760, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5800, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5840, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5840, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5880, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5880, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5920, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5920, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5960, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:5960, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6000, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6000, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6000, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6040, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6040, wy:80, tiles:2, h:1, tspikes:[]});
+    P.push({wx:6040, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6080, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6080, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6120, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6120, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6120, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6160, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6160, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6160, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6200, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6200, wy:80, tiles:3, h:1, tspikes:[]});
+    P.push({wx:6200, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6240, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6240, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6280, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6280, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6320, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6320, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6320, wy:80, tiles:2, h:1, tspikes:[]});
+    P.push({wx:6360, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6360, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6400, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6400, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6400, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6440, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6440, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6440, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6480, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6480, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6480, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6480, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6520, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6520, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6520, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6520, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6560, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6560, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6560, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6560, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6600, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6600, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6600, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6600, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6640, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6640, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6640, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6640, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6680, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6680, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6680, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6720, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6720, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6720, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6760, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6760, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6760, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6800, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6800, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6800, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6840, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6840, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6840, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6880, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6880, wy:80, tiles:5, h:1, tspikes:[]});
+    P.push({wx:6880, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6920, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6920, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6960, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:6960, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7000, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7000, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7040, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7040, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7040, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7080, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7080, wy:40, tiles:2, h:1, tspikes:[]});
+    P.push({wx:7080, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7080, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7120, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7120, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7120, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7160, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7160, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7160, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7160, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7200, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7200, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7200, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7200, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7240, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7240, wy:40, tiles:2, h:1, tspikes:[]});
+    P.push({wx:7240, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7240, wy:120, tiles:15, h:1, tspikes:[]});
+    P.push({wx:7280, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7280, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7280, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7320, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7320, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7320, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7320, wy:40, tiles:3, h:1, tspikes:[]});
+    P.push({wx:7360, wy:-40, tiles:4, h:1, tspikes:[]});
+    P.push({wx:7360, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7360, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7360, wy:80, tiles:2, h:1, tspikes:[]});
+    P.push({wx:7400, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7400, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7440, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7440, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7440, wy:40, tiles:9, h:1, tspikes:[]});
+    P.push({wx:7440, wy:80, tiles:10, h:1, tspikes:[]});
+    P.push({wx:7440, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7480, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7480, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7480, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7520, wy:0, tiles:3, h:1, tspikes:[]});
+    P.push({wx:7520, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7520, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7560, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7560, wy:160, tiles:7, h:1, tspikes:[]});
+    P.push({wx:7600, wy:200, tiles:2, h:1, tspikes:[]});
+    P.push({wx:7640, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7680, wy:0, tiles:2, h:1, tspikes:[]});
+    P.push({wx:7680, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7720, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7760, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7760, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7800, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7800, wy:200, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7800, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:7840, wy:0, tiles:17, h:1, tspikes:[]});
+    P.push({wx:7960, wy:200, tiles:4, h:1, tspikes:[]});
+    P.push({wx:8120, wy:200, tiles:2, h:1, tspikes:[]});
+    P.push({wx:8200, wy:200, tiles:6, h:1, tspikes:[]});
+    P.push({wx:8440, wy:200, tiles:17, h:1, tspikes:[]});
+    P.push({wx:8440, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8480, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8520, wy:0, tiles:15, h:1, tspikes:[]});
+    P.push({wx:8520, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8560, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8600, wy:40, tiles:4, h:1, tspikes:[]});
+    P.push({wx:8640, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8680, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8720, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8760, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8760, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8800, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8800, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8840, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8880, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:8960, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9000, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9040, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9080, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9120, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9120, wy:0, tiles:2, h:1, tspikes:[]});
+    P.push({wx:9120, wy:200, tiles:6, h:1, tspikes:[]});
+    P.push({wx:9160, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9200, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9200, wy:40, tiles:9, h:1, tspikes:[]});
+    P.push({wx:9240, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9280, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9320, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9360, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9400, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9440, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9480, wy:200, tiles:3, h:1, tspikes:[]});
+    P.push({wx:9480, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9520, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9560, wy:0, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9560, wy:40, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9560, wy:120, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9560, wy:80, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9560, wy:160, tiles:1, h:1, tspikes:[]});
+    P.push({wx:9600, wy:120, tiles:10, h:1, tspikes:[]});
+    S.push(640); S.push(5800); S.push(5800);
+    CS.push(5800);
+    PT.push({wx:5120}); PT.push({wx:9560});
+    IS.push({wx:5560, wy:80}); IS.push({wx:6440, wy:120}); IS.push({wx:7000, wy:120}); IS.push({wx:7240, wy:160}); IS.push({wx:8160, wy:40}); IS.push({wx:8400, wy:40}); IS.push({wx:8600, wy:80}); IS.push({wx:8920, wy:40});
+    var DZ=[]; DZ.push({wx:3640}); DZ.push({wx:3760}); DZ.push({wx:7840});
+    var GS=[]; GS.push(1040); GS.push(1440); GS.push(2200); GS.push(4160);
+    var CN=[]; CN.push({wx:4400, wy:280}); CN.push({wx:8880, wy:80});
+    var BP=[]; BP.push({wx:4520, wy:280, flipped:false}); BP.push({wx:9400, wy:80, flipped:true});
+    return {len:10800, spikes:S, cspikes:CS, walls:[], platforms:P, pillars:PL, smallspikes:SS, portals:PT, invspikes:IS, darkzones:DZ, ghostspikes:GS, coins:CN, bouncepads:BP};
+  },
+  // 6 — עמודים גובה 2-3, שני קוצים
+  function(mkWall,mkP){ var S=[], P=[], CS=[], PL=[];
+    P.push({wx:700,  wy:null, tiles:8, h:2, tspikes:[1,5]});
+    S.push(1060); S.push(1100); S.push(1140);
+    PL.push(mkP(1220, 3)); PL.push(mkP(1380, 2)); PL.push(mkP(1540, 3));
+    P.push({wx:1700, wy:null, tiles:8, h:1, tspikes:[2,5]});
+    S.push(2060); S.push(2100); S.push(2140);
+    PL.push(mkP(2220, 2)); PL.push(mkP(2380, 3)); PL.push(mkP(2540, 2));
+    P.push({wx:2700, wy:null, tiles:8, h:2, tspikes:[1,5]});
+    S.push(3060); S.push(3100); S.push(3140);
+    PL.push(mkP(3220, 3)); PL.push(mkP(3380, 2)); PL.push(mkP(3540, 3));
+    P.push({wx:3700, wy:null, tiles:8, h:1, tspikes:[2,5]});
+    S.push(4060); S.push(4100); S.push(4140);
+    CS.push(760); CS.push(960); CS.push(1160); CS.push(1360); CS.push(1560); CS.push(1760); CS.push(1960); CS.push(2160); CS.push(2360); CS.push(2560); CS.push(2760); CS.push(2960); CS.push(3160);
+    return {len:4700, spikes:S, cspikes:CS, walls:[], platforms:P, pillars:PL};
+  },
+  // 7 — עמודים גובה 2-3, שני קוצים, מהיר
+  function(mkWall,mkP){ var S=[], P=[], CS=[], PL=[];
+    P.push({wx:700,  wy:null, tiles:8, h:1, tspikes:[1,5]});
+    S.push(1060); S.push(1100);
+    PL.push(mkP(1200, 2)); PL.push(mkP(1360, 3)); PL.push(mkP(1520, 2));
+    P.push({wx:1680, wy:null, tiles:8, h:2, tspikes:[2,5]});
+    S.push(2040); S.push(2080); S.push(2120);
+    PL.push(mkP(2200, 3)); PL.push(mkP(2360, 2)); PL.push(mkP(2520, 3));
+    P.push({wx:2680, wy:null, tiles:8, h:1, tspikes:[1,5]});
+    S.push(3040); S.push(3080); S.push(3120);
+    PL.push(mkP(3200, 2)); PL.push(mkP(3360, 3)); PL.push(mkP(3520, 2));
+    P.push({wx:3680, wy:null, tiles:8, h:2, tspikes:[2,5]});
+    S.push(4040); S.push(4080); S.push(4120);
+    PL.push(mkP(4200, 2)); PL.push(mkP(4360, 3));
+    P.push({wx:4520, wy:null, tiles:8, h:1, tspikes:[1,5]});
+    CS.push(900); CS.push(1120); CS.push(1340); CS.push(1560); CS.push(1780); CS.push(2000); CS.push(2200); CS.push(2400); CS.push(2600); CS.push(2800); CS.push(3000); CS.push(3200); CS.push(3400); CS.push(3600); CS.push(3800);
+    return {len:5200, spikes:S, cspikes:CS, walls:[], platforms:P, pillars:PL};
+  },
+];
+function makeLevel(lvl){
+  resize();
+  var fy = FLOOR();
+  var EDITOR_FLOOR = 8 * 40;
+  function mkWall(wx, h, w){ return { wx:wx, wy: fy - h*T, tiles:w, h:h }; }
+  function mkPillar(wx, h){ return { wx:wx, h:h }; }
+  // טען מ-localStorage אם קיים
+  var savedKey = 'dashes_level_' + lvl;
+  var savedStr = localStorage.getItem(savedKey);
+  var map;
+  if(savedStr){
+    try{ map = JSON.parse(savedStr); } catch(e){ map = null; }
+  }
+  if(!map){
+    map = LEVEL_MAPS[Math.min(lvl-1, LEVEL_MAPS.length-1)](mkWall, mkPillar);
+  }
+
+  for(var i=0; i<map.platforms.length; i++){
+    var pl = map.platforms[i];
+    if(pl.wy === null){
+      pl.wy = fy - pl.h * T;
+    } else if(pl.wy > 0 && pl.wy <= EDITOR_FLOOR){
+      var rowsFromFloor = (EDITOR_FLOOR - pl.wy) / T;
+      pl.wy = fy - rowsFromFloor * T;
+    }
+  }
+
+  if(map.invspikes){
+    for(var i=0; i<map.invspikes.length; i++){
+      var sp = map.invspikes[i];
+      if(sp.wy > 0 && sp.wy <= EDITOR_FLOOR){
+        var rowsFromFloor = (EDITOR_FLOOR - sp.wy) / T;
+        sp.wy = fy - rowsFromFloor * T;
+      }
+    }
+  }
+
+  if(!map.pillars)    map.pillars    = [];
+  if(!map.smallspikes)map.smallspikes= [];
+  if(map.SS)          map.smallspikes= map.SS;
+  if(!map.portals)    map.portals    = [];
+  if(!map.bouncepads) map.bouncepads = [];
+  for(var i=0; i<map.bouncepads.length; i++){
+    var bp = map.bouncepads[i];
+    if(bp.wy !== null && bp.wy !== undefined && bp.wy > 0 && bp.wy <= EDITOR_FLOOR){
+      var rowsFromFloor = (EDITOR_FLOOR - bp.wy) / T;
+      bp.wy = fy - rowsFromFloor * T;
+    } else if(bp.wy === null || bp.wy === undefined){
+      bp.wy = fy;
+    }
+  }
+  if(!map.invspikes)  map.invspikes  = [];
+  if(!map.popspikes)   map.popspikes   = [];
+  if(!map.ghostspikes) map.ghostspikes = [];
+  if(!map.coins)       map.coins       = [];
+  // המרת קואורדינטות מטבעות מעורך למשחק
+  for(var i=0; i<map.coins.length; i++){
+    var cn = map.coins[i];
+    if(cn.wy > 0 && cn.wy <= EDITOR_FLOOR){
+      var rowsFromFloor = (EDITOR_FLOOR - cn.wy) / T;
+      cn.wy = fy - rowsFromFloor * T - T;
+    }
+  }
+  if(!map.darkzones)  map.darkzones  = []; // אזורי חושך
+  return map;
+}
+
+// ─────────────────────────────────────────
+// GAME STATE
+// ─────────────────────────────────────────
+var active=false, paused=false, raf=null, curLvl=1;
+var LD={}, P={}, camX=0, prog=0, ufoUsed=false;
+
+function startLevel(lvl){
+  curLvl = lvl;
+  document.getElementById('pauseOverlay').classList.remove('on');
+  showScreen(''); // hide all screens, show canvas
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('on'); });
+  document.getElementById('hud').style.display = '';
+
+  stopGame();
+  initLevel();
+  active=true; paused=false;
+  held=false; edge=false;
+  raf = requestAnimationFrame(loop);
+}
+
+function initLevel(){
+  resize();
+  LD = makeLevel(curLvl);
+  var fy = FLOOR();
+  var isShip = (selChar==='ship');
+  P = {
+    x: 100,
+    y: fy - T,        // on the floor
+    w: isShip ? 44 : T,
+    h: isShip ? 22 : T,
+    vx: SPEEDS[curLvl-1],
+    vy: 0,
+    angle: 0,
+    grounded: true
+  };
+  camX  = 0;
+  prog  = 0;
+  ufoUsed = false;
+  flipped = false;
+  darkMode = false;
+  darkTimer = 0;
+  shield = false;
+  coinsCollected = 0;
+  coinEffects = [];
+  winAnim = false;
+  winTimer = 0;
+  setHUD(0);
+}
+
+function stopGame(){
+  active = false;
+  if(raf){ cancelAnimationFrame(raf); raf=null; }
+  document.getElementById('hud').style.display = 'none';
+}
+
+function togglePause(){
+  if(!active) return;
+  paused = !paused;
+  if(paused){
+    document.getElementById('pauseOverlay').classList.add('on');
+  } else {
+    document.getElementById('pauseOverlay').classList.remove('on');
+    raf = requestAnimationFrame(loop);
+  }
+}
+
+function retry(){
+  document.getElementById('pauseOverlay').classList.remove('on');
+  startLevel(curLvl);
+}
+
+// ─────────────────────────────────────────
+// PHYSICS  (runs every frame)
+// ─────────────────────────────────────────
+var flipped = false;
+var coinsCollected = 0;
+var coinEffects = []; // אפקט איסוף מטבע
+var darkMode = false; // מצב חושך
+var darkTimer = 0;   // טיימר לחושך
+var shield = false;  // מגן
+
+function tick(){
+  var fy = FLOOR();
+  var cy = CEIL();
+  var gravDir = flipped ? -1 : 1;
+
+  // ── קפיצה ──
+  if(selChar === 'ship'){
+    if(held)  P.vy -= 0.55 * gravDir;
+    else      P.vy += 0.55 * gravDir;
+    P.vy = Math.max(-5, Math.min(5, P.vy));
+  } else {
+    if((edge || held) && P.grounded){
+      P.vy = JUMP_VY * gravDir;
+      P.grounded = false;
+    }
+    if(!P.grounded){
+      P.vy += GRAV * gravDir;
+      P.vy = Math.max(-22, Math.min(22, P.vy));
+    }
+  }
+
+  edge = false;
+
+  // ── תזוזה ──
+  P.x += P.vx;
+  P.y += P.vy;
+
+  // ── עדכן מהירות (שלב 1 מואץ בהדרגה) ──
+  P.vx = getTargetSpeed();
+
+  // ── מצלמה ──
+  camX = P.x - W * 0.25;
+
+  // ── האצה הדרגתית ──
+  if(curLvl === 1){
+    P.vx = 6.5 + (8 - 6.5) * prog;
+  } else if(curLvl === 4){
+    P.vx = 7.5 + (9 - 7.5) * prog;
+  } else {
+    P.vx = SPEEDS[curLvl-1];
+  }
+
+  // ── איפוס grounded — לפני בדיקות ──
+  P.grounded = false;
+
+  // ── רצפה / תקרה ──
+  if(!flipped){
+    if(P.y + P.h >= fy){ P.y = fy - P.h; P.vy = 0; P.grounded = true; }
+    if(selChar === 'ship' && P.y <= cy){ P.y = cy; P.vy = 0; }
+  } else {
+    if(P.y <= cy){ P.y = cy; P.vy = 0; P.grounded = true; }
+    if(P.y + P.h >= fy){ P.y = fy - P.h; P.vy = 0; }
+  }
+
+  // ── HITBOX ──
+  var px1 = P.x + 4, px2 = P.x + P.w - 4;
+  var py1 = P.y + 4, py2 = P.y + P.h - 4;
+
+  // ── פורטל ──
+  if(LD.portals){
+    for(var i=0; i<LD.portals.length; i++){
+      var pt = LD.portals[i];
+      var ptx1 = pt.wx + 4, ptx2 = pt.wx + T - 4;
+      var portalY1 = FLOOR() - T*2, portalY2 = FLOOR();
+      if(px2 > ptx1 && px1 < ptx2 && py2 > portalY1 && py1 < portalY2 && !pt.used){
+        flipped = !flipped;
+        pt.used = true;
+        P.vy = flipped ? -4 : 4;
+        P.grounded = false;
+        gravDir = flipped ? -1 : 1;
+      }
+      if(P.x > ptx2) pt.used = false;
+    }
+  }
+
+  // ── מקפצות ──
+  if(LD.bouncepads){
+    for(var i=0; i<LD.bouncepads.length; i++){
+      var bp = LD.bouncepads[i];
+      var bpx1 = bp.wx + 2, bpx2 = bp.wx + T - 2;
+      var flipped2 = bp.flipped || false;
+      // קפיצה של 6 בלוקים למעלה: vy = sqrt(2 * GRAV * 6*T)
+      var bounceVY = Math.sqrt(2 * GRAV * T * 6);
+      if(!flipped2){
+        var bpy = bp.wy - T*0.5;
+        if(px2 > bpx1 && px1 < bpx2 && P.y + P.h >= bpy && P.y + P.h <= bp.wy + T*0.2){
+          P.y = bpy - P.h;
+          P.vy = -bounceVY;
+          // airTime = 2*bounceVY/GRAV, distance = vx * airTime
+          // רוצים 3 בלוקים קדימה:
+          P.vx = (T * 3 * GRAV) / (2 * bounceVY);
+          P.grounded = false;
+        }
+      } else {
+        var bpy2 = bp.wy + T*0.5;
+        if(px2 > bpx1 && px1 < bpx2 && P.y <= bpy2 && P.y >= bpy2 - T*0.5 && P.vy <= 0){
+          P.y = bpy2;
+          P.vy = bounceVY;
+          P.vx = (T * 3 * GRAV) / (2 * bounceVY);
+          P.grounded = false;
+        }
+      }
+    }
+  }
+
+  // ── קוצי רצפה ──
+  if(!flipped){
+    for(var i=0; i<LD.spikes.length; i++){
+      var wx = LD.spikes[i];
+      if(px2 > wx+6 && px1 < wx+T-6 && py2 > fy-T+4 && py1 < fy-1){ die(); return; }
+    }
+    if(LD.smallspikes){
+      for(var i=0; i<LD.smallspikes.length; i++){
+        var wx = LD.smallspikes[i];
+        if(px2 > wx+6 && px1 < wx+T-6 && py2 > fy-T/2+4 && py1 < fy-1){ die(); return; }
+      }
+    }
+  }
+
+  // ── קוצי תקרה ──
+  for(var i=0; i<LD.cspikes.length; i++){
+    var wx = LD.cspikes[i];
+    if(px2 > wx+6 && px1 < wx+T-6 && py2 > cy+1 && py1 < cy+T-4){ die(); return; }
+  }
+
+  // ── קוצים נשלפים ──
+  if(LD.popspikes){
+    for(var i=0; i<LD.popspikes.length; i++){
+      var ps = LD.popspikes[i];
+      // מחזוריות: צץ כל ps.period פריימים למשך ps.duration פריימים
+      ps.timer = (ps.timer || 0) + 1;
+      var cycle = ps.timer % (ps.period || 120);
+      ps.out = cycle < (ps.duration || 40);
+      if(ps.out){
+        var psx1 = ps.wx + 6, psx2 = ps.wx + T - 6;
+        var psy1 = FLOOR() - T + 4, psy2 = FLOOR() - 1;
+        if(px2 > psx1 && px1 < psx2 && py2 > psy1 && py1 < psy2){
+          if(shield){ shield = false; }
+          else { die(); return; }
+        }
+      }
+    }
+  }
+
+  // ── מצב חושך — לפי אזורי חושך בשלב ──
+  darkTimer++;
+  if(LD.darkzones && LD.darkzones.length > 0){
+    darkMode = false;
+    for(var i=0; i<LD.darkzones.length; i++){
+      var dz = LD.darkzones[i];
+      var dzStart = dz.wx - 100;
+      var dzEnd   = dz.wx + T * 3 + 100;
+      if(P.x > dzStart && P.x < dzEnd){ darkMode = true; break; }
+    }
+  } else {
+    darkMode = false;
+  }
+
+  // ── קוצים בלתי נראים ──
+  if(LD.ghostspikes){
+    for(var i=0; i<LD.ghostspikes.length; i++){
+      var wx  = LD.ghostspikes[i];
+      var wx1 = wx + 6, wx2 = wx + T - 6;
+      var wy1 = fy - T + 4, wy2 = fy - 1;
+      if(px2 > wx1 && px1 < wx2 && py2 > wy1 && py1 < wy2){
+        if(shield){ shield=false; }
+        else { die(); return; }
+      }
+    }
+  }
+
+  // ── inverted spikes — הורגים תמיד ──
+  if(LD.invspikes){
+    for(var i=0; i<LD.invspikes.length; i++){
+      var sp = LD.invspikes[i];
+      var sx1 = sp.wx+6, sx2 = sp.wx+T-6;
+      var sy1 = sp.wy+2, sy2 = sp.wy+T-2;
+      if(px2 > sx1 && px1 < sx2 && py2 > sy1 && py1 < sy2){ die(); return; }
+    }
+  }
+
+  // ── פלטפורמות ──
+  if(LD.platforms){
+    for(var i=0; i<LD.platforms.length; i++){
+      var pl  = LD.platforms[i];
+      var plx1 = pl.wx + 3;
+      var plx2 = pl.wx + pl.tiles*T - 3;
+      var ply  = pl.wy;
+      var plb  = pl.wy + pl.h*T;
+
+      if(px2 <= plx1 || px1 >= plx2) continue; // אין חפיפה אופקית
+
+      if(selChar === 'ship'){
+        if(py2 > ply && py1 < plb){ die(); return; }
+      } else if(!flipped){
+        // רגיל — נוחת על הגג
+        if(P.vy >= 0 && P.y + P.h >= ply && P.y < ply){
+          P.y = ply - P.h; P.vy = 0; P.grounded = true;
+        } else if(py2 > ply && py1 < plb){
+          die(); return;
+        }
+      } else {
+        // הפוך — נוחת על התחתית
+        if(P.vy <= 0 && P.y <= plb && P.y + P.h > plb){
+          P.y = plb; P.vy = 0; P.grounded = true;
+        } else if(py2 > ply && py1 < plb){
+          die(); return;
+        }
+      }
+    }
+  }
+
+  // ── עמודים ──
+  if(LD.pillars && !flipped){
+    var fy2 = FLOOR();
+    for(var i=0; i<LD.pillars.length; i++){
+      var pl = LD.pillars[i];
+      var topY = fy2 - pl.h*T;
+      var plx1 = pl.wx+3, plx2 = pl.wx+T-3;
+      if(px2 > plx1 && px1 < plx2 && py2 > topY && py1 < fy2){ die(); return; }
+      if(px2 > pl.wx+8 && px1 < pl.wx+T-8 && py2 > topY-T*1.2+8 && py1 < topY-2){ die(); return; }
+    }
+  }
+
+  // ── tspikes ──
+  if(LD.platforms && !flipped){
+    for(var i=0; i<LD.platforms.length; i++){
+      var pl = LD.platforms[i];
+      if(!pl.tspikes || !pl.tspikes.length) continue;
+      for(var ts=0; ts<pl.tspikes.length; ts++){
+        var tsx1 = pl.wx + pl.tspikes[ts]*T + 8;
+        var tsx2 = pl.wx + pl.tspikes[ts]*T + T - 8;
+        if(px2 > tsx1 && px1 < tsx2 && py2 > pl.wy-T*1.2+8 && py1 < pl.wy-2){ die(); return; }
+      }
+    }
+  }
+
+  // ── progress ──
+  prog = Math.max(0, Math.min(1, (P.x - 100) / (LD.len - 500)));
+  setHUD(prog);
+
+  // ── rotation ──
+  if(selChar === 'ship'){
+    P.angle = P.vy * 3.5;
+  } else if(P.grounded){
+    P.angle = 0;
+    P.vy = 0;
+  } else {
+    P.angle = (P.angle + P.vx * 3) % 360;
+  }
+
+  // ── מטבעות — איסוף ──
+  if(LD.coins){
+    for(var i=LD.coins.length-1; i>=0; i--){
+      var cn = LD.coins[i];
+      var cnx = cn.wx - camX;
+      var cny = cn.wy;
+      var dist = Math.sqrt(Math.pow(P.x+P.w/2 - (cn.wx+T/2), 2) + Math.pow(P.y+P.h/2 - (cny+T/2), 2));
+      if(dist < T){
+        LD.coins.splice(i,1);
+        coinsCollected++;
+        earnCoins(1);
+        spawnCoinEffect(cn.wx+T/2, cny+T/2);
+        var chud = document.getElementById('coinHUD');
+        if(chud) chud.textContent = '★'+getTotalCoins();
+      }
+    }
+  }
+
+  // ── מקפצות ──
+  if(LD.bouncepads){
+    for(var i=0; i<LD.bouncepads.length; i++){
+      var bp = LD.bouncepads[i];
+      var bpx1 = bp.wx + 2, bpx2 = bp.wx + T - 2;
+      var bpy  = bp.wyScreen;
+      if(px2 > bpx1 && px1 < bpx2){
+        if(!bp.flipped){
+          // רגיל — על הרצפה, מקפיץ למעלה
+          if(P.vy >= 0 && P.y + P.h >= bpy && P.y + P.h <= bpy + T){
+            P.y = bpy - P.h;
+            P.vy = JUMP_VY * 1.6; // 6 בלוקים
+            P.grounded = false;
+          }
+        } else {
+          // הפוך — על תקרה/פלטפורמה, מקפיץ למטה
+          if(P.vy <= 0 && P.y <= bpy + T && P.y >= bpy){
+            P.y = bpy + T;
+            P.vy = -JUMP_VY * 1.6;
+            P.grounded = false;
+          }
+        }
+      }
+    }
+  }
+
+  // ── level finish ──
+  if(!winAnim && P.x >= LD.len - 500){ startWinAnim(); }
+}
+
+// ─────────────────────────────────────────
+// DIE / WIN
+// ─────────────────────────────────────────
+// ── particles ──
+var particles = [];
+
+function spawnCoinEffect(x, y){
+  coinEffects.push({x:x, y:y, life:1.0, vy:-2});
+}
+
+function spawnWinExplosion(x, y){
+  particles = [];
+  var col = getCurColor();
+  var colors = [col.color, col.stroke, '#ffd700', '#ffffff', '#00ffff'];
+
+  // 7 חתיכות גדולות שנופלות לרצפה
+  for(var j=0; j<7; j++){
+    var angle = (j / 7) * Math.PI * 2;
+    var speed = 5 + Math.random() * 6;
+    particles.push({
+      x: x, y: y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 8,
+      size: T/2 + Math.random()*8,
+      color: col.color,
+      innerColor: col.inner,
+      isCube: true,
+      life: 1.0,
+      rot: Math.random()*360,
+      rotv: (Math.random()-0.5)*25,
+      // כשנוגעים ברצפה מתפוצצים לחלקיקים קטנים
+      exploded: false,
+    });
+  }
+
+  // פיצוץ ראשוני — הרבה חלקיקים
+  for(var i=0; i<30; i++){
+    var a2 = Math.random()*Math.PI*2;
+    var s2 = 4 + Math.random()*12;
+    particles.push({
+      x: x, y: y,
+      vx: Math.cos(a2)*s2, vy: Math.sin(a2)*s2 - 6,
+      size: 3+Math.random()*7,
+      color: colors[Math.floor(Math.random()*colors.length)],
+      isCube: false, life: 1.0,
+      rot: Math.random()*360, rotv: (Math.random()-0.5)*25,
+      exploded: true,
+    });
+  }
+}
+
+function updateWinParticles(){
+  var fy = FLOOR();
+  for(var i=particles.length-1; i>=0; i--){
+    var p = particles[i];
+    p.x  += p.vx;
+    p.y  += p.vy;
+    p.vy += 0.6; // כבידה
+    p.rot += p.rotv;
+    p.life -= 0.018;
+
+    // חתיכות גדולות שנוגעות ברצפה — מתפוצצות לחלקיקים
+    if(p.isCube && !p.exploded && p.y + p.size >= fy){
+      p.y = fy - p.size;
+      p.vy *= -0.3; p.vx *= 0.5;
+      p.exploded = true;
+      // יוצר 5 חלקיקים קטנים
+      var col2 = getCurColor();
+      var colors2 = [col2.color, '#ffd700', '#ffffff', '#00ffff'];
+      for(var k=0; k<5; k++){
+        var a3 = Math.random()*Math.PI*2;
+        particles.push({
+          x: p.x, y: p.y,
+          vx: Math.cos(a3)*(3+Math.random()*6),
+          vy: Math.sin(a3)*(3+Math.random()*6) - 4,
+          size: 2+Math.random()*5,
+          color: colors2[Math.floor(Math.random()*colors2.length)],
+          isCube: false, life: 0.8,
+          rot: Math.random()*360, rotv: (Math.random()-0.5)*20,
+          exploded: true,
+        });
+      }
+    }
+
+    if(p.life <= 0) particles.splice(i,1);
+  }
+}
+
+function spawnParticles(x, y){
+  particles = [];
+  var colors = ['#00e400','#00cfff','#ffffff','#ffd700','#ff4444'];
+
+  // חתיכות קוביה — 4 ריבועים שמתפרקים
+  var pieces = [
+    {ox:-T/4, oy:-T/4}, {ox:T/4, oy:-T/4},
+    {ox:-T/4, oy:T/4},  {ox:T/4, oy:T/4}
+  ];
+  for(var j=0; j<pieces.length; j++){
+    var angle = Math.atan2(pieces[j].oy, pieces[j].ox);
+    var speed = 4 + Math.random() * 4;
+    particles.push({
+      x: x + pieces[j].ox, y: y + pieces[j].oy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 3,
+      size: T/2 - 2,
+      color: '#00e400',
+      innerColor: '#004400',
+      isCube: true,
+      life: 1.0,
+      rot: 0,
+      rotv: (Math.random()-0.5) * 15
+    });
+  }
+
+  // ניצוצות קטנים
+  for(var i=0; i<16; i++){
+    var angle2 = Math.random() * Math.PI * 2;
+    var speed2 = 3 + Math.random() * 7;
+    particles.push({
+      x: x, y: y,
+      vx: Math.cos(angle2) * speed2,
+      vy: Math.sin(angle2) * speed2 - 4,
+      size: 3 + Math.random() * 5,
+      color: colors[Math.floor(Math.random()*colors.length)],
+      isCube: false,
+      life: 1.0,
+      rot: Math.random() * 360,
+      rotv: (Math.random()-0.5) * 20
+    });
+  }
+}
+
+function updateParticles(){
+  for(var i=particles.length-1; i>=0; i--){
+    var p = particles[i];
+    p.x  += p.vx;
+    p.y  += p.vy;
+    p.vy += 0.4;
+    p.rot += p.rotv;
+    p.life -= 0.04;
+    if(p.life <= 0) particles.splice(i,1);
+  }
+}
+
+function drawParticles(){
+  for(var i=0; i<particles.length; i++){
+    var p = particles[i];
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    ctx.translate(p.x - camX, p.y);
+    ctx.rotate(p.rot * Math.PI/180);
+    if(p.isCube){
+      var s = p.size * p.life; // מתכווץ
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+      ctx.fillRect(-s/2, -s/2, s, s);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(-s/2, -s/2, s, s);
+      ctx.fillStyle = p.innerColor;
+      ctx.fillRect(-s/4, -s/4, s/2, s/2);
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+      ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+}
+
+var dying = false; // אנימציית מוות פעילה
+
+function die(){
+  active = false;
+  dying = true;
+  spawnParticles(P.x + P.w/2, P.y + P.h/2);
+
+  // הצג מסך תוצאה אחרי האנימציה
+  var pct = Math.floor(prog*100);
+  var prev = getBest(curLvl);
+  var isNewBest = pct > prev && pct > 0;
+  saveBest(curLvl, pct);
+
+  // הרץ אנימציה לפני הצגת המסך
+  var deathRaf;
+  function deathLoop(){
+    updateParticles();
+    draw(true); // true = הסתר קובייה
+    drawParticles();
+    if(particles.length > 0){
+      deathRaf = requestAnimationFrame(deathLoop);
+    } else {
+      dying = false;
+      document.getElementById('resPct').textContent = pct + '%';
+      document.getElementById('resLbl').textContent = 'YOU DIED';
+      document.getElementById('resLbl').style.color = '';
+      var nb = document.getElementById('newBestBadge');
+      if(nb) nb.style.display = isNewBest ? 'block' : 'none';
+      var nextBtn = document.getElementById('nextBtn');
+      if(nextBtn) nextBtn.style.display = 'none';
+      showScreen('resultScreen');
+      document.getElementById('hud').style.display = 'none';
+    }
+  }
+  document.getElementById('hud').style.display = 'none';
+  requestAnimationFrame(deathLoop);
+}
+
+var winAnim = false;
+var winTimer = 0;
+var WIN_DURATION = 270; // ~4.5 שניות
+
+function startWinAnim(){
+  if(winAnim) return;
+  winAnim = true;
+  winTimer = 0;
+  active = false;
+  if(raf){ cancelAnimationFrame(raf); raf=null; }
+  P.vx = 0; P.vy = 0;
+  requestAnimationFrame(winStep);
+}
+
+function winStep(){
+  if(!winAnim) return;
+  winTimer++;
+  var finX = LD.len - 300;
+  var targetY = FLOOR() - T * 5;
+
+  updateWinParticles();
+
+  if(winTimer < 90){
+    // שלב 1: מרחף למעלה, סיבוב מואץ בהדרגה
+    P.y += (targetY - P.y) * 0.08;
+    var spin = (winTimer/90) * (winTimer/90) * 22;
+    P.angle += spin;
+  } else {
+    // שלב 2: נשאב לקו
+    var pull = Math.min((winTimer-90) * 0.4, 30);
+    P.angle += 20 + pull;
+    P.x += pull;
+    P.y += (targetY - P.y) * 0.06;
+
+    if(P.x + P.w/2 >= finX){
+      spawnWinExplosion(P.x + P.w/2, P.y + P.h/2);
+      P.x = 9999999;
+      winAnim = false;
+      function ploop(){
+        updateWinParticles();
+        draw(true);
+        drawParticles();
+        if(particles.length > 0){ requestAnimationFrame(ploop); }
+        else { setTimeout(win, 200); }
+      }
+      requestAnimationFrame(ploop);
+      return;
+    }
+  }
+
+  camX = P.x - W * 0.25;
+  draw(false);
+  drawParticles();
+  requestAnimationFrame(winStep);
+}
+
+function win(){
+  winAnim = false;
+  active = false;
+  saveBest(curLvl, 100);
+  shieldCount++;
+  localStorage.setItem('shields', shieldCount);
+  updateShieldHUD();
+  earnCoins(curLvl);
+  document.getElementById('resPct').textContent = '100%';
+  document.getElementById('resLbl').textContent = '🎉 LEVEL COMPLETE!';
+  document.getElementById('resLbl').style.color = '#ffd700';
+  var nb = document.getElementById('newBestBadge');
+  if(nb) nb.style.display = 'none';
+  var nextBtn = document.getElementById('nextBtn');
+  if(nextBtn) nextBtn.style.display = curLvl < 7 ? '' : 'none';
+  showScreen('resultScreen');
+  document.getElementById('hud').style.display = 'none';
+}
+
+function nextLevel(){
+  if(curLvl < 7) startLevel(curLvl + 1);
+}
+
+function setHUD(p){
+  document.getElementById('pf').style.width = (p*100)+'%';
+  document.getElementById('pp').textContent = Math.floor(p*100)+'%';
+}
+
+// ─────────────────────────────────────────
+// RENDERING
+// ─────────────────────────────────────────
+
+// Draw a single GD-style block tile at (bx, by)
+function drawBlock(bx, by, th){
+  // glow effect
+  // main fill — dark
+  ctx.fillStyle = th.block;
+  ctx.fillRect(bx, by, T, T);
+  // neon border
+  ctx.strokeStyle = th.blockStroke;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(bx+1, by+1, T-2, T-2);
+  // inner square
+  ctx.fillStyle = th.blockInner;
+  ctx.fillRect(bx+7, by+7, T-14, T-14);
+  // inner neon line
+  ctx.strokeStyle = th.blockStroke;
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bx+7, by+7, T-14, T-14);
+  ctx.globalAlpha = 1;
+  // corner dots neon
+  ctx.fillStyle = th.blockStroke;
+  ctx.fillRect(bx+3, by+3, 2, 2);
+  ctx.fillRect(bx+T-5, by+3, 2, 2);
+  ctx.fillRect(bx+3, by+T-5, 2, 2);
+  ctx.fillRect(bx+T-5, by+T-5, 2, 2);
+}
+
+// ציור פלטפורמה שלמה — בלי קווים פנימיים
+function drawPlatform(px, py, w, h, th){
+  var totalW = w * T;
+  var totalH = h * T;
+  // fill
+  ctx.fillStyle = th.block;
+  ctx.fillRect(px, py, totalW, totalH);
+  // border neon — רק מסביב לכל הפלטפורמה
+  ctx.strokeStyle = th.blockStroke; ctx.lineWidth = 2;
+  ctx.strokeRect(px+1, py+1, totalW-2, totalH-2);
+  // inner rect
+  ctx.fillStyle = th.blockInner;
+  ctx.fillRect(px+5, py+5, totalW-10, totalH-10);
+  ctx.strokeStyle = th.blockStroke; ctx.globalAlpha = 0.4; ctx.lineWidth = 1;
+  ctx.strokeRect(px+5, py+5, totalW-10, totalH-10);
+  ctx.globalAlpha = 1;
+  // corner dots
+  ctx.fillStyle = th.blockStroke;
+  ctx.fillRect(px+3, py+3, 3, 3);
+  ctx.fillRect(px+totalW-6, py+3, 3, 3);
+  ctx.fillRect(px+3, py+totalH-6, 3, 3);
+  ctx.fillRect(px+totalW-6, py+totalH-6, 3, 3);
+}
+
+function draw(hidePlayer){
+  var fy = FLOOR(), cy = CEIL();
+  var th = getTheme();
+
+  // ── רקע ──
+  ctx.fillStyle = th.sky1;
+  ctx.fillRect(0,0,W,H);
+
+  // ── עיר פרלקס פשוטה ──
+  var bsc = (camX * 0.12);
+  var BW = W / 80;
+  var bgBlocks = [
+    {x:0,y:60,w:5,h:7},{x:8,y:40,w:3,h:9},{x:13,y:70,w:6,h:6},
+    {x:22,y:30,w:4,h:10},{x:28,y:55,w:5,h:7},{x:35,y:45,w:3,h:8},
+    {x:42,y:20,w:4,h:12},{x:48,y:50,w:6,h:6},{x:56,y:35,w:3,h:9},
+    {x:62,y:65,w:5,h:5},{x:70,y:25,w:4,h:11},{x:78,y:60,w:3,h:7},
+  ];
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  for(var i=0; i<bgBlocks.length; i++){
+    var bb = bgBlocks[i];
+    var bx2 = ((bb.x * BW - bsc % (W*1.2) + W*2)) % (W*1.2) - W*0.1;
+    var bw2 = bb.w * BW, bh2 = bb.h * (fy/19);
+    ctx.fillRect(bx2, fy - bh2, bw2, bh2);
+  }
+
+  // ── underground ──
+  ctx.fillStyle = th.ground;
+  ctx.fillRect(0, fy, W, H-fy);
+  // tiled underground blocks
+  var off = (-(camX % T) + T) % T;
+  for(var tx = off-T; tx < W+T; tx += T){
+    drawBlock(tx, fy, th);
+    drawBlock(tx, fy+T, th);
+  }
+
+  // ── floor glow line — נייון חזק ──
+  
+  ctx.fillStyle = th.glow;
+  ctx.fillRect(0, fy-2, W, 4);
+  
+  ctx.globalAlpha = 0.2;
+  ctx.fillRect(0, fy-8, W, 16);
+  ctx.globalAlpha = 1;
+  
+
+  // ── ship ceiling ──
+  if(selChar==='ship'){
+    ctx.fillStyle = th.ground;
+    ctx.fillRect(0, 0, W, cy);
+    var coff = (-(camX % T) + T) % T;
+    for(var tx = coff-T; tx < W+T; tx += T){
+      drawBlock(tx, cy - T, th);
+    }
+    ctx.fillStyle = th.glow;
+    
+    ctx.fillRect(0, cy-1, W, 3);
+    
+  }
+
+  // ── raised GD platforms / walls ──
+  if(LD.platforms){
+    for(var i=0; i<LD.platforms.length; i++){
+      var pl = LD.platforms[i];
+      var px = pl.wx - camX;
+      // בדוק שהפלטפורמה על המסך — תמיד צייר גם אם wy שלילי
+      if(px + pl.tiles*T < -5 || px > W+5) continue;
+      // צייר פלטפורמה שלמה — בלי קווים פנימיים
+      var plyActual = (pl.wy !== null && pl.wy !== undefined) ? pl.wy : (FLOOR() - pl.h * T);
+      drawPlatform(px, plyActual, pl.tiles, pl.h, th);
+      // ── קיר מחבר לפלטפורמה הבאה — רק אם שתיהן על הרצפה ──
+      if(i+1 < LD.platforms.length){
+        var next = LD.platforms[i+1];
+        var gap = next.wx - (pl.wx + pl.tiles*T);
+        var floorY = FLOOR();
+        var plOnFloor   = Math.abs(pl.wy   + pl.h*T   - floorY) < 5;
+        var nextOnFloor = Math.abs(next.wy + next.h*T - floorY) < 5;
+        if(gap < 360 && next.wy !== pl.wy && plOnFloor && nextOnFloor){
+          // צייר קיר אנכי בצד ימין של הפלטפורמה הנמוכה יותר
+          var higherPl  = next.wy < pl.wy ? next : pl;
+          var lowerPl   = next.wy < pl.wy ? pl   : next;
+          var wallX     = next.wy < pl.wy ? next.wx : (pl.wx + pl.tiles*T - T);
+          var wallX_scr = wallX - camX;
+          var heightDiff = lowerPl.wy - higherPl.wy; // בפיקסלים
+          var numBlocks  = Math.round(heightDiff / T);
+          for(var bi=0; bi<numBlocks; bi++){
+            drawBlock(wallX_scr, higherPl.wy + bi*T, th);
+          }
+          // גלאו על גג הקיר המחבר
+          ctx.fillStyle = th.glow; 
+          ctx.fillRect(wallX_scr, higherPl.wy - 1, T, 3);
+          
+        }
+      }
+      // glow on top edge
+      ctx.fillStyle = th.glow;
+      
+      ctx.fillRect(px, pl.wy - 1, pl.tiles * T, 3);
+      
+      // סכינים על הפלטפורמה — גדולים וברורים
+      if(pl.tspikes){
+        for(var ts=0; ts<pl.tspikes.length; ts++){
+          var tsx = (pl.wx + pl.tspikes[ts]*T) - camX;
+          if(tsx+T < -5 || tsx > W+5) continue;
+          ctx.fillStyle = th.spikeFill;
+          
+          // קוץ גדול — מ-wy עד wy-T*1.2
+          ctx.beginPath();
+          ctx.moveTo(tsx + 2,     pl.wy);
+          ctx.lineTo(tsx + T/2,   pl.wy - T*1.2);
+          ctx.lineTo(tsx + T - 2, pl.wy);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = th.glow; ctx.lineWidth = 1.5;
+          ctx.stroke();
+          
+        }
+      }
+    }
+  }
+
+  // ── עמודים עם קוץ ואנטנה ──
+  if(LD.pillars){
+    for(var i=0; i<LD.pillars.length; i++){
+      var pl = LD.pillars[i];
+      var px = pl.wx - camX;
+      if(px+T < -5 || px > W+5) continue;
+      var fy2 = FLOOR();
+      var topY = fy2 - pl.h * T;
+      // צייר עמוד (בלוק אחד רוחב)
+      for(var hi=0; hi<pl.h; hi++){
+        drawBlock(px, topY + hi*T, th);
+      }
+      // גלאו על גג העמוד
+      ctx.fillStyle = th.glow; 
+      ctx.fillRect(px, topY - 1, T, 3);
+      
+      // קוץ מעל העמוד
+      ctx.fillStyle = th.spikeFill;
+      
+      ctx.beginPath();
+      ctx.moveTo(px + 2,   topY);
+      ctx.lineTo(px + T/2, topY - T*1.2);
+      ctx.lineTo(px + T-2, topY);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = th.glow; ctx.lineWidth = 1.5; ctx.stroke();
+      
+      // אנטנה מעל הקוץ
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(px + T/2, topY - T*1.2);
+      ctx.lineTo(px + T/2, topY - T*2.2);
+      ctx.stroke();
+      // נקודה בקצה האנטנה
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(px + T/2, topY - T*2.2, 3, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  // ── פורטלים — גובה 2 בלוקים ──
+  if(LD.portals){
+    for(var i=0; i<LD.portals.length; i++){
+      var pt = LD.portals[i];
+      var px2 = pt.wx - camX;
+      if(px2+T < -5 || px2 > W+5) continue;
+      var portalH = T * 2;
+      var portalY = FLOOR() - portalH;
+      ctx.fillStyle = 'rgba(220,0,255,0.85)';
+      ctx.fillRect(px2 + T*0.35, portalY, T*0.3, portalH);
+      // טבעת
+      ctx.strokeStyle = 'rgba(255,100,255,0.9)';
+      ctx.lineWidth = 3;
+      
+      ctx.beginPath();
+      ctx.ellipse(px2 + T/2, portalY + portalH/2, T*0.4, portalH*0.45, 0, 0, Math.PI*2);
+      ctx.stroke();
+      
+      ctx.fillStyle = '#fff'; ctx.font = '6px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      ctx.fillText('FLIP', px2+T/2, portalY-4);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // ── קוצים הפוכים קטנים — מצביעים למטה ──
+  if(LD.invspikes){
+    for(var i=0; i<LD.invspikes.length; i++){
+      var sp = LD.invspikes[i];
+      var sx = sp.wx - camX;
+      var sy = sp.wy; // y של הגג (הקוץ תלוי מהגג למטה)
+      if(sx+T < -5 || sx > W+5) continue;
+      ctx.fillStyle = th.spikeFill;
+      
+      ctx.beginPath();
+      ctx.moveTo(sx,     sy);        // שמאל-עליון
+      ctx.lineTo(sx+T/2, sy + T/2);  // קצה למטה (הפוך!)
+      ctx.lineTo(sx+T,   sy);        // ימין-עליון
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(255,100,255,0.4)'; ctx.lineWidth=1; ctx.stroke();
+      
+    }
+  }
+
+  // ── קוצים נשלפים ──
+  if(LD.popspikes){
+    for(var i=0; i<LD.popspikes.length; i++){
+      var ps = LD.popspikes[i];
+      var psx = ps.wx - camX;
+      if(psx+T < -5 || psx > W+5) continue;
+      var progress = ps.out ? Math.min(1, (ps.timer % (ps.period||120)) / 8) : Math.max(0, 1 - (ps.timer % (ps.period||120) - (ps.duration||40)) / 8);
+      var spikeH = progress * T;
+      if(spikeH < 2) continue;
+      ctx.fillStyle = '#ff4444';
+      
+      ctx.beginPath();
+      ctx.moveTo(psx, FLOOR());
+      ctx.lineTo(psx+T/2, FLOOR()-spikeH);
+      ctx.lineTo(psx+T, FLOOR());
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='#ff8888'; ctx.lineWidth=1; ctx.stroke();
+      
+    }
+  }
+
+  // ── floor spikes ──
+  for(var i=0; i<LD.spikes.length; i++){
+    var sx=LD.spikes[i]-camX;
+    if(sx+T<-5||sx>W+5) continue;
+    ctx.fillStyle = th.spikeFill;
+    
+    ctx.beginPath();
+    ctx.moveTo(sx,     fy);
+    ctx.lineTo(sx+T/2, fy-T);
+    ctx.lineTo(sx+T,   fy);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
+    ctx.stroke();
+    
+  }
+
+  // ── קוצים בלתי נראים — נראים רק בטווח 150px ──
+  if(LD.ghostspikes){
+    for(var i=0; i<LD.ghostspikes.length; i++){
+      var gsx = LD.ghostspikes[i] - camX;
+      if(gsx+T<-5||gsx>W+5) continue;
+      var playerScreenX = P.x - camX + P.w/2;
+      var dist = Math.abs(gsx + T/2 - playerScreenX);
+      var vis = Math.max(0, 1 - dist/150); // נעלם מעבר ל-150px
+      if(vis <= 0) continue;
+      ctx.globalAlpha = vis * 0.9;
+      ctx.fillStyle = '#ff00ff';
+       ctx.shadowBlur = 15 * vis;
+      ctx.beginPath();
+      ctx.moveTo(gsx,     fy);
+      ctx.lineTo(gsx+T/2, fy-T);
+      ctx.lineTo(gsx+T,   fy);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(255,0,255,0.6)'; ctx.lineWidth=1;
+      ctx.stroke();
+      ctx.globalAlpha = 1; 
+    }
+  }
+
+  // ── קוצים קטנים (חצי גובה) ──
+  if(LD.smallspikes){
+    for(var i=0; i<LD.smallspikes.length; i++){
+      var sx=LD.smallspikes[i]-camX;
+      if(sx+T<-5||sx>W+5) continue;
+      ctx.fillStyle = th.spikeFill;
+      
+      ctx.beginPath();
+      ctx.moveTo(sx,     fy);
+      ctx.lineTo(sx+T/2, fy-T/2);
+      ctx.lineTo(sx+T,   fy);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
+      ctx.stroke();
+      
+    }
+  }
+
+  // ── ceiling spikes ──
+  for(var i=0; i<LD.cspikes.length; i++){
+    var sx=LD.cspikes[i]-camX;
+    if(sx+T<-5||sx>W+5) continue;
+    ctx.fillStyle = th.spikeFill;
+    
+    ctx.beginPath();
+    ctx.moveTo(sx,     cy);
+    ctx.lineTo(sx+T/2, cy+T);
+    ctx.lineTo(sx+T,   cy);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
+    ctx.stroke();
+    
+  }
+
+  // ── hanging walls ──
+  for(var i=0; i<LD.walls.length; i++){
+    var wl=LD.walls[i], wx=wl.wx-camX;
+    if(wx+T<-5||wx>W+5) continue;
+    for(var hi=0; hi<Math.ceil(wl.h/T); hi++){
+      drawBlock(wx, cy + hi*T, th);
+    }
+    ctx.strokeStyle = th.blockStroke; ctx.lineWidth=2;
+    ctx.strokeRect(wx, cy, T, wl.h);
+    // spikes on wall bottom
+    var wb=cy+wl.h, sw=T/2;
+    ctx.fillStyle = th.spikeFill;
+    
+    for(var sx2=wx; sx2<wx+T; sx2+=sw){
+      ctx.beginPath();
+      ctx.moveTo(sx2,      wb);
+      ctx.lineTo(sx2+sw/2, wb+sw);
+      ctx.lineTo(sx2+sw,   wb);
+      ctx.closePath(); ctx.fill();
+    }
+    
+  }
+
+  // ── מקפצות ──
+  if(LD.bouncepads){
+    for(var i=0; i<LD.bouncepads.length; i++){
+      var bp = LD.bouncepads[i];
+      var bsx = bp.wx - camX;
+      if(bsx+T < -5 || bsx > W+5) continue;
+      var flp = bp.flipped || false;
+      var bsy = flp ? bp.wy : bp.wy - T*0.3;
+      var bsh = T*0.3;
+      // פס תחתון/עליון
+      ctx.fillStyle = '#00ffcc';
+      ctx.fillRect(bsx, bsy + (flp?0:bsh*0.7), T, bsh*0.3);
+      // קפיצים — 3 קווים מתכופפים
+      ctx.strokeStyle = '#00ffcc';
+      ctx.lineWidth = 3;
+      for(var k=0; k<3; k++){
+        var kx = bsx + T*0.2 + k*(T*0.3);
+        ctx.beginPath();
+        if(!flp){
+          ctx.moveTo(kx, bsy+bsh);
+          ctx.lineTo(kx+5, bsy+bsh*0.5);
+          ctx.lineTo(kx, bsy);
+        } else {
+          ctx.moveTo(kx, bsy);
+          ctx.lineTo(kx+5, bsy+bsh*0.5);
+          ctx.lineTo(kx, bsy+bsh);
+        }
+        ctx.stroke();
+      }
+      // כיתוב קטן
+      ctx.fillStyle = '#fff';
+      ctx.font = '7px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      ctx.fillText(flp?'↓':'↑', bsx+T/2, flp ? bsy+bsh+10 : bsy-4);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // ── finish line ──
+  var finX = LD.len - 300 - camX;
+  if(finX > -20 && finX < W+20){
+    ctx.strokeStyle='rgba(255,215,0,0.9)'; ctx.lineWidth=3;
+    
+    ctx.setLineDash([8,5]);
+    ctx.beginPath(); ctx.moveTo(finX,0); ctx.lineTo(finX,fy); ctx.stroke();
+    ctx.setLineDash([]);
+    
+    ctx.fillStyle='#ffd700'; ctx.font='9px "Press Start 2P"';
+    ctx.fillText('FINISH', finX+5, 36);
+  }
+
+  // ── מטבעות ──
+  if(LD.coins){
+    ctx.fillStyle = '#ffd700';
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for(var i=0; i<LD.coins.length; i++){
+      var cn = LD.coins[i];
+      var cx = cn.wx - camX + T/2;
+      var cy2 = cn.wy + T/2;
+      if(cx < -T || cx > W+T) continue;
+      ctx.beginPath(); ctx.arc(cx, cy2, T/2-4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#aa7700';
+      ctx.fillText('★', cx, cy2+1);
+      ctx.fillStyle = '#ffd700';
+    }
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+  // ── אפקטי מטבע ──
+  ctx.font = '12px "Press Start 2P"'; ctx.textAlign='center';
+  for(var i=coinEffects.length-1; i>=0; i--){
+    var ce = coinEffects[i];
+    ce.y += ce.vy; ce.life -= 0.05;
+    if(ce.life <= 0){ coinEffects.splice(i,1); continue; }
+    ctx.globalAlpha = ce.life;
+    ctx.fillStyle = '#ffd700';
+    ctx.fillText('+★', ce.x - camX, ce.y);
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
+
+  // ── player ──
+  if(!hidePlayer){
+  var sx=P.x-camX, sy=P.y, h2=T/2;
+  ctx.save(); ctx.translate(sx+P.w/2, sy+P.h/2);
+  ctx.shadowColor = th.glow; ctx.shadowBlur = 12;
+
+  if(selChar==='cube'){
+    ctx.rotate(P.angle*Math.PI/180);
+    var col = getCurColor();
+    var cubeColor=col.color, cubeInner=col.inner, cubeStroke=col.stroke;
+    if(shield){ ctx.shadowColor='#00ffff'; ctx.shadowBlur=30; }
+    else { ctx.shadowColor=cubeStroke; ctx.shadowBlur=20; }
+    ctx.fillStyle=cubeColor; ctx.fillRect(-h2,-h2,T,T);
+    ctx.shadowBlur=0;
+    ctx.fillStyle=cubeInner;
+    if(selPattern==='stripes'){
+      ctx.fillRect(-h2,-h2+8,T,8); ctx.fillRect(-h2,-h2+24,T,8);
+    } else if(selPattern==='squares'){
+      ctx.fillRect(-h2+4,-h2+4,10,10); ctx.fillRect(h2-14,-h2+4,10,10);
+      ctx.fillRect(-h2+4,h2-14,10,10); ctx.fillRect(h2-14,h2-14,10,10);
+    } else if(selPattern==='dots'){
+      [[-8,-8],[8,-8],[0,0],[-8,8],[8,8]].forEach(function(d){
+        ctx.beginPath(); ctx.arc(d[0],d[1],5,0,Math.PI*2); ctx.fill();
+      });
+    } else if(selPattern==='diamond'){
+      ctx.beginPath(); ctx.moveTo(0,-h2+4); ctx.lineTo(h2-4,0); ctx.lineTo(0,h2-4); ctx.lineTo(-h2+4,0); ctx.closePath(); ctx.fill();
+    } else {
+      ctx.fillRect(-h2+8,-h2+8,T-16,T-16);
+    }
+    ctx.strokeStyle=cubeStroke; ctx.lineWidth=2.5;
+    ctx.shadowColor=cubeStroke; ctx.shadowBlur=12;
+    ctx.strokeRect(-h2,-h2,T,T);
+    ctx.shadowBlur=0;
+
+  } else if(selChar==='ship'){
+    ctx.rotate(P.angle*Math.PI/180);
+    ctx.shadowColor = th.glow; ctx.shadowBlur = 20;
+    ctx.fillStyle = th.block;
+    ctx.beginPath(); ctx.moveTo(-22,11); ctx.lineTo(22,0); ctx.lineTo(-22,-11);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = th.glow; ctx.lineWidth = 2; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = th.glow; ctx.beginPath(); ctx.arc(-19,0,5,0,Math.PI*2); ctx.fill();
+    // engine flame neon
+    ctx.shadowColor = th.glow; ctx.shadowBlur = 15;
+    ctx.fillStyle = th.glow;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath(); ctx.moveTo(-22,-8); ctx.lineTo(-34,0); ctx.lineTo(-22,8); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+
+  } else if(selChar==='ufo'){
+    ctx.rotate(P.angle*Math.PI/180);
+    ctx.fillStyle='#f5a623';
+    ctx.beginPath(); ctx.ellipse(0,-4,h2,h2*1.1,0,Math.PI,0); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='#00cfff';
+    ctx.beginPath(); ctx.ellipse(0,6,h2,h2*0.6,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#ffd700';
+    [-10,0,10].forEach(function(lx){ ctx.beginPath(); ctx.arc(lx,9,3.5,0,Math.PI*2); ctx.fill(); });
+
+  } else { // ball
+    ctx.rotate(P.angle*Math.PI/180);
+    ctx.fillStyle='#f5a623'; ctx.beginPath(); ctx.arc(0,0,h2,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(0,0,h2*0.55,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(-h2,0); ctx.lineTo(h2,0); ctx.moveTo(0,-h2); ctx.lineTo(0,h2); ctx.stroke();
+  }
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // ── neon trail ──
+  ctx.shadowColor = th.glow; ctx.shadowBlur = 10;
+  for(var i=1;i<=8;i++){
+    var s=8-i;
+    ctx.globalAlpha = (8-i)/12;
+    ctx.fillStyle = th.glow;
+    ctx.fillRect(sx-i*7+P.w/2-s/2, sy+P.h/2-s/2, s, s);
+  }
+  ctx.globalAlpha=1; ctx.shadowBlur=0;
+  } // end if(!hidePlayer)
+
+  // ── מצב חושך — שכבה שחורה עם חור ──
+  if(darkMode){
+    var playerCX = P.x + P.w/2 - camX;
+    var playerCY = P.y + P.h/2;
+    var radius = 130;
+    // צור canvas זמני
+    var oc = document.createElement('canvas');
+    oc.width = W; oc.height = H;
+    var octx = oc.getContext('2d');
+    // מלא שחור
+    octx.fillStyle = 'rgba(0,0,0,0.97)';
+    octx.fillRect(0,0,W,H);
+    // מחק עיגול סביב השחקן
+    octx.globalCompositeOperation = 'destination-out';
+    var g = octx.createRadialGradient(playerCX, playerCY, 0, playerCX, playerCY, radius);
+    g.addColorStop(0,   'rgba(0,0,0,1)');
+    g.addColorStop(0.6, 'rgba(0,0,0,1)');
+    g.addColorStop(1,   'rgba(0,0,0,0)');
+    octx.fillStyle = g;
+    octx.fillRect(0,0,W,H);
+    // צייר על ה-canvas הראשי
+    ctx.drawImage(oc, 0, 0);
+  }
+
+} // end draw
+// ─────────────────────────────────────────
+// ─────────────────────────────────────────
+function loop(){
+  tick();
+  if(!active) return; // died this frame
+  draw();
+  raf = requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
